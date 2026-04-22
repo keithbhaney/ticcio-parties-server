@@ -309,6 +309,82 @@ app.post('/reset', (req, res) => {
 });
 
 
+
+// ── SORT IT DATABASE ──
+// Each question has 4 items sorted correct order (index 0 = first/smallest/oldest)
+const SORT_DB = {
+  movies: { label: "🎬 Movies — Release Year", prompt: "Oldest to newest", questions: [
+    { items: ["Star Wars (1977)","E.T. (1982)","Titanic (1997)","Avatar (2009)"], hint:"Order by release year, oldest first" },
+    { items: ["Casablanca (1942)","The Godfather (1972)","Jurassic Park (1993)","The Dark Knight (2008)"], hint:"Order by release year, oldest first" },
+    { items: ["Psycho (1960)","Jaws (1975)","Forrest Gump (1994)","Inception (2010)"], hint:"Order by release year, oldest first" },
+    { items: ["Gone With the Wind (1939)","2001: A Space Odyssey (1968)","Rocky (1976)","Gladiator (2000)"], hint:"Order by release year, oldest first" },
+    { items: ["Citizen Kane (1941)","The Exorcist (1973)","Schindler's List (1993)","No Country for Old Men (2007)"], hint:"Order by release year, oldest first" }
+  ]},
+  presidents: { label: "🏛️ US Presidents — Order of Service", prompt: "First to most recent", questions: [
+    { items: ["Abraham Lincoln","Theodore Roosevelt","John F. Kennedy","Barack Obama"], hint:"Order by when they served, earliest first" },
+    { items: ["George Washington","Andrew Jackson","Dwight Eisenhower","Ronald Reagan"], hint:"Order by when they served, earliest first" },
+    { items: ["Thomas Jefferson","Ulysses S. Grant","Franklin D. Roosevelt","Richard Nixon"], hint:"Order by when they served, earliest first" },
+    { items: ["John Adams","Woodrow Wilson","Harry Truman","Bill Clinton"], hint:"Order by when they served, earliest first" },
+    { items: ["James Madison","Abraham Lincoln","Herbert Hoover","George H.W. Bush"], hint:"Order by when they served, earliest first" }
+  ]},
+  population: { label: "🌍 Countries — Population", prompt: "Smallest to largest population", questions: [
+    { items: ["Canada","United States","Brazil","China"], hint:"Order by population, smallest first" },
+    { items: ["Australia","Germany","Indonesia","India"], hint:"Order by population, smallest first" },
+    { items: ["Portugal","Mexico","Russia","China"], hint:"Order by population, smallest first" },
+    { items: ["New Zealand","South Korea","Japan","United States"], hint:"Order by population, smallest first" },
+    { items: ["Switzerland","Spain","Nigeria","Bangladesh"], hint:"Order by population, smallest first" }
+  ]},
+  inventions: { label: "⚙️ Inventions — When Invented", prompt: "Oldest to most recent", questions: [
+    { items: ["Printing Press","Steam Engine","Telephone","Internet"], hint:"Order by invention date, oldest first" },
+    { items: ["Compass","Gunpowder","Light Bulb","Microwave"], correct:[0,1,2,3], hint:"Order by invention date, oldest first" },
+    { items: ["Wheel","Telescope","Radio","Television"], hint:"Order by invention date, oldest first" },
+    { items: ["Paper","Bicycle","Airplane","Smartphone"], hint:"Order by invention date, oldest first" },
+    { items: ["Concrete","Steam Locomotive","X-Ray Machine","GPS"], hint:"Order by invention date, oldest first" }
+  ]},
+  space: { label: "🚀 Space Milestones", prompt: "Earliest to most recent", questions: [
+    { items: ["First Satellite (Sputnik)","First Human in Space","Moon Landing","Mars Rover (Curiosity)"], hint:"Order by when it happened, earliest first" },
+    { items: ["First Rocket Launch","First Dog in Space","First Spacewalk","Hubble Telescope Launch"], hint:"Order by when it happened, earliest first" },
+    { items: ["First American in Space","First Woman in Space","Space Shuttle First Flight","International Space Station"], hint:"Order by when it happened, earliest first" },
+    { items: ["Sputnik Launch","Moon Landing","Space Shuttle Program","SpaceX Falcon 9 Reuse"], hint:"Order by when it happened, earliest first" },
+    { items: ["First Satellite","Yuri Gagarin in Space","Viking Mars Landing","Voyager leaving Solar System"], hint:"Order by when it happened, earliest first" }
+  ]},
+  animals: { label: "🐾 Animals — Lifespan", prompt: "Shortest to longest lifespan", questions: [
+    { items: ["Mouse","Cat","Horse","Tortoise"], hint:"Order by average lifespan, shortest first" },
+    { items: ["Hamster","Dog","Elephant","Bowhead Whale"], hint:"Order by average lifespan, shortest first" },
+    { items: ["Rabbit","Chimpanzee","Hippopotamus","Greenland Shark"], hint:"Order by average lifespan, shortest first" },
+    { items: ["Guinea Pig","Lion","Camel","Giant Tortoise"], hint:"Order by average lifespan, shortest first" },
+    { items: ["Bee","Crow","Crocodile","Koi Fish"], hint:"Order by average lifespan, shortest first" }
+  ]},
+  music: { label: "🎵 Albums — Release Year", prompt: "Oldest to newest", questions: [
+    { items: ["Abbey Road (Beatles)","Thriller (Jackson)","The Eminem Show","Lemonade (Beyonce)"], hint:"Order by release year, oldest first" },
+    { items: ["Led Zeppelin IV","Purple Rain (Prince)","The Slim Shady LP","Adele - 21"], hint:"Order by release year, oldest first" },
+    { items: ["Dark Side of the Moon","Born in the USA (Springsteen)","Nevermind (Nirvana)","Fearless (T. Swift)"], hint:"Order by release year, oldest first" },
+    { items: ["Rumours (Fleetwood Mac)","Graceland (Paul Simon)","Jagged Little Pill (Alanis)","Get Rich or Die Tryin'"], hint:"Order by release year, oldest first" },
+    { items: ["Pet Sounds (Beach Boys)","Hotel California (Eagles)","The Chronic (Dr. Dre)","21 Adele"], hint:"Order by release year, oldest first" }
+  ]},
+  buildings: { label: "🏢 Buildings — Height", prompt: "Shortest to tallest", questions: [
+    { items: ["Eiffel Tower","Empire State Building","One World Trade Center","Burj Khalifa"], hint:"Order by height, shortest first" },
+    { items: ["Washington Monument","Chrysler Building","CN Tower","Shanghai Tower"], hint:"Order by height, shortest first" },
+    { items: ["Leaning Tower of Pisa","Eiffel Tower","Taipei 101","Burj Khalifa"], hint:"Order by height, shortest first" },
+    { items: ["Big Ben","Empire State Building","Petronas Towers","Makkah Royal Clock Tower"], hint:"Order by height, shortest first" },
+    { items: ["Statue of Liberty","Eiffel Tower","One World Trade Center","Burj Khalifa"], hint:"Order by height, shortest first" }
+  ]},
+  sports: { label: "🏅 Sports Records & Events", prompt: "Earliest to most recent", questions: [
+    { items: ["First Modern Olympics","First Super Bowl","First FIFA World Cup Final on TV","Michael Jordan's 6th Championship"], hint:"Order by when it happened, earliest first" },
+    { items: ["Babe Ruth's 60 Home Runs","Roger Bannister 4-min Mile","Muhammad Ali vs Frazier I","Michael Phelps 8 Gold Medals"], hint:"Order by when it happened, earliest first" },
+    { items: ["Jesse Owens 4 Golds (Olympics)","First NBA Season","First Wimbledon on TV","LeBron's First Championship"], hint:"Order by when it happened, earliest first" },
+    { items: ["First Baseball World Series","First NFL Championship","First NBA Finals","First Soccer World Cup"], hint:"Order by when it happened, earliest first" },
+    { items: ["Jim Thorpe Olympics Gold","Wilt Chamberlain 100-pt Game","Secretariat Triple Crown","Serena Williams First Slam"], hint:"Order by when it happened, earliest first" }
+  ]},
+  science: { label: "🔬 Scientific Discoveries", prompt: "Earliest to most recent", questions: [
+    { items: ["Gravity (Newton)","Evolution Theory (Darwin)","Penicillin (Fleming)","DNA Structure (Watson/Crick)"], hint:"Order by discovery date, earliest first" },
+    { items: ["Electricity (Franklin)","Periodic Table (Mendeleev)","Theory of Relativity (Einstein)","Higgs Boson Confirmed"], hint:"Order by discovery date, earliest first" },
+    { items: ["Heliocentrism (Copernicus)","Laws of Motion (Newton)","Germ Theory (Pasteur)","Human Genome Mapped"], hint:"Order by discovery date, earliest first" },
+    { items: ["Oxygen Discovered","Vaccination (Jenner)","X-Rays (Roentgen)","Nuclear Fission"], hint:"Order by discovery date, earliest first" },
+    { items: ["Calculus (Newton/Leibniz)","Electrons Discovered","Quantum Theory (Planck)","Black Hole Photographed"], hint:"Order by discovery date, earliest first" }
+  ]}
+};
+
 // ── TRIVIA DATABASE ──
 // 10 categories, 5 questions each, easy→hard, multiple choice (4 options, index of correct)
 const TRIVIA_DB = {
@@ -415,6 +491,103 @@ const TRIVIA_DB = {
 };
 
 // ── TRIVIA: GET CATEGORIES ──
+
+// ── SORT IT: CATEGORIES ──
+app.get('/sortit/categories', (req, res) => {
+  res.json(Object.entries(SORT_DB).map(([key, val]) => ({ key, label: val.label, prompt: val.prompt })));
+});
+
+// ── SORT IT: START ──
+app.post('/sortit/start', (req, res) => {
+  if (!verifyHost(req, res)) return;
+  const { category, timeLimit, immunityType } = req.body;
+  const cat = SORT_DB[category];
+  if (!cat) return res.status(400).json({ error: 'Unknown category' });
+
+  // Pick random question
+  const q = cat.questions[Math.floor(Math.random() * cat.questions.length)];
+  // Shuffle items for players
+  const shuffled = [...q.items].sort(() => Math.random() - 0.5);
+
+  gameState.sortChallenge = {
+    category, categoryLabel: cat.label,
+    prompt: cat.prompt,
+    correctOrder: q.items,      // correct answer (server only for scoring)
+    shuffledItems: shuffled,    // what players see
+    hint: q.hint,
+    playerAnswers: {},          // { playerName: [ordered items] }
+    scores: {},                 // { playerName: points }
+    revealed: false,
+    timeLimit: timeLimit || 45,
+    immunityType: immunityType || 'individual',
+    startedAt: Date.now(),
+    ended: false,
+  };
+  gameState.phase = 'challenge';
+  gameState.currentChallenge = { name: cat.label, type: 'sortit' };
+  gameState.immuneNames = [];
+  gameState.pictureChallenge = null;
+  gameState.triviaChallenge = null;
+  gameState.updatedAt = Date.now();
+  res.json({ ok: true });
+});
+
+// ── SORT IT: SUBMIT ANSWER ──
+app.post('/sortit/answer', (req, res) => {
+  const { playerName, orderedItems } = req.body;
+  const sc = gameState.sortChallenge;
+  if (!sc || sc.ended) return res.status(400).json({ error: 'No active challenge' });
+  if (sc.playerAnswers[playerName]) return res.json({ ok: true, alreadyAnswered: true });
+
+  sc.playerAnswers[playerName] = orderedItems;
+
+  // Score: count correct positions
+  let correct = 0;
+  orderedItems.forEach((item, i) => { if (item === sc.correctOrder[i]) correct++; });
+  const pts = correct === 4 ? 3 : correct === 3 ? 2 : correct >= 2 ? 1 : 0;
+  sc.scores[playerName] = pts;
+  gameState.updatedAt = Date.now();
+  res.json({ ok: true, correct, pts });
+});
+
+// ── SORT IT: REVEAL (host) ──
+app.post('/sortit/reveal', (req, res) => {
+  if (!verifyHost(req, res)) return;
+  const sc = gameState.sortChallenge;
+  if (!sc) return res.status(400).json({ error: 'No challenge' });
+  sc.revealed = true;
+  gameState.updatedAt = Date.now();
+  res.json({ ok: true, correctOrder: sc.correctOrder });
+});
+
+// ── SORT IT: END ──
+app.post('/sortit/end', (req, res) => {
+  if (!verifyHost(req, res)) return;
+  const sc = gameState.sortChallenge;
+  if (!sc) return res.status(400).json({ error: 'No challenge' });
+  sc.ended = true;
+  const { scores, immunityType } = sc;
+  let immuneNames = [];
+  if (immunityType === 'team') {
+    const ts = {};
+    gameState.teams.forEach(t => ts[t] = 0);
+    gameState.players.filter(p => !p.eliminated).forEach(p => {
+      if (p.team) ts[p.team] = (ts[p.team] || 0) + (scores[p.name] || 0);
+    });
+    const max = Math.max(...Object.values(ts));
+    const winTeams = Object.entries(ts).filter(([, s]) => s === max).map(([t]) => t);
+    immuneNames = gameState.players.filter(p => !p.eliminated && winTeams.includes(p.team)).map(p => p.name);
+  } else {
+    const max = Math.max(...Object.values(scores), 0);
+    immuneNames = Object.entries(scores).filter(([, s]) => s === max).map(([n]) => n);
+  }
+  gameState.immuneNames = immuneNames;
+  gameState.players.forEach(p => { p.immune = immuneNames.includes(p.name); });
+  gameState.votingPool = gameState.players.filter(p => !p.eliminated && !p.immune).map(p => p.name);
+  gameState.updatedAt = Date.now();
+  res.json({ ok: true, scores, immuneNames, correctOrder: sc.correctOrder });
+});
+
 app.get('/trivia/categories', (req, res) => {
   const cats = Object.entries(TRIVIA_DB).map(([key, val]) => ({ key, label: val.label, count: val.questions.length }));
   res.json(cats);
@@ -526,6 +699,82 @@ app.post('/trivia/end', (req, res) => {
   res.json({ ok: true, scores, immuneNames });
 });
 
+
+// ── SORT IT DATABASE ──
+// Each question has 4 items sorted correct order (index 0 = first/smallest/oldest)
+const SORT_DB = {
+  movies: { label: "🎬 Movies — Release Year", prompt: "Oldest to newest", questions: [
+    { items: ["Star Wars (1977)","E.T. (1982)","Titanic (1997)","Avatar (2009)"], hint:"Order by release year, oldest first" },
+    { items: ["Casablanca (1942)","The Godfather (1972)","Jurassic Park (1993)","The Dark Knight (2008)"], hint:"Order by release year, oldest first" },
+    { items: ["Psycho (1960)","Jaws (1975)","Forrest Gump (1994)","Inception (2010)"], hint:"Order by release year, oldest first" },
+    { items: ["Gone With the Wind (1939)","2001: A Space Odyssey (1968)","Rocky (1976)","Gladiator (2000)"], hint:"Order by release year, oldest first" },
+    { items: ["Citizen Kane (1941)","The Exorcist (1973)","Schindler's List (1993)","No Country for Old Men (2007)"], hint:"Order by release year, oldest first" }
+  ]},
+  presidents: { label: "🏛️ US Presidents — Order of Service", prompt: "First to most recent", questions: [
+    { items: ["Abraham Lincoln","Theodore Roosevelt","John F. Kennedy","Barack Obama"], hint:"Order by when they served, earliest first" },
+    { items: ["George Washington","Andrew Jackson","Dwight Eisenhower","Ronald Reagan"], hint:"Order by when they served, earliest first" },
+    { items: ["Thomas Jefferson","Ulysses S. Grant","Franklin D. Roosevelt","Richard Nixon"], hint:"Order by when they served, earliest first" },
+    { items: ["John Adams","Woodrow Wilson","Harry Truman","Bill Clinton"], hint:"Order by when they served, earliest first" },
+    { items: ["James Madison","Abraham Lincoln","Herbert Hoover","George H.W. Bush"], hint:"Order by when they served, earliest first" }
+  ]},
+  population: { label: "🌍 Countries — Population", prompt: "Smallest to largest population", questions: [
+    { items: ["Canada","United States","Brazil","China"], hint:"Order by population, smallest first" },
+    { items: ["Australia","Germany","Indonesia","India"], hint:"Order by population, smallest first" },
+    { items: ["Portugal","Mexico","Russia","China"], hint:"Order by population, smallest first" },
+    { items: ["New Zealand","South Korea","Japan","United States"], hint:"Order by population, smallest first" },
+    { items: ["Switzerland","Spain","Nigeria","Bangladesh"], hint:"Order by population, smallest first" }
+  ]},
+  inventions: { label: "⚙️ Inventions — When Invented", prompt: "Oldest to most recent", questions: [
+    { items: ["Printing Press","Steam Engine","Telephone","Internet"], hint:"Order by invention date, oldest first" },
+    { items: ["Compass","Gunpowder","Light Bulb","Microwave"], correct:[0,1,2,3], hint:"Order by invention date, oldest first" },
+    { items: ["Wheel","Telescope","Radio","Television"], hint:"Order by invention date, oldest first" },
+    { items: ["Paper","Bicycle","Airplane","Smartphone"], hint:"Order by invention date, oldest first" },
+    { items: ["Concrete","Steam Locomotive","X-Ray Machine","GPS"], hint:"Order by invention date, oldest first" }
+  ]},
+  space: { label: "🚀 Space Milestones", prompt: "Earliest to most recent", questions: [
+    { items: ["First Satellite (Sputnik)","First Human in Space","Moon Landing","Mars Rover (Curiosity)"], hint:"Order by when it happened, earliest first" },
+    { items: ["First Rocket Launch","First Dog in Space","First Spacewalk","Hubble Telescope Launch"], hint:"Order by when it happened, earliest first" },
+    { items: ["First American in Space","First Woman in Space","Space Shuttle First Flight","International Space Station"], hint:"Order by when it happened, earliest first" },
+    { items: ["Sputnik Launch","Moon Landing","Space Shuttle Program","SpaceX Falcon 9 Reuse"], hint:"Order by when it happened, earliest first" },
+    { items: ["First Satellite","Yuri Gagarin in Space","Viking Mars Landing","Voyager leaving Solar System"], hint:"Order by when it happened, earliest first" }
+  ]},
+  animals: { label: "🐾 Animals — Lifespan", prompt: "Shortest to longest lifespan", questions: [
+    { items: ["Mouse","Cat","Horse","Tortoise"], hint:"Order by average lifespan, shortest first" },
+    { items: ["Hamster","Dog","Elephant","Bowhead Whale"], hint:"Order by average lifespan, shortest first" },
+    { items: ["Rabbit","Chimpanzee","Hippopotamus","Greenland Shark"], hint:"Order by average lifespan, shortest first" },
+    { items: ["Guinea Pig","Lion","Camel","Giant Tortoise"], hint:"Order by average lifespan, shortest first" },
+    { items: ["Bee","Crow","Crocodile","Koi Fish"], hint:"Order by average lifespan, shortest first" }
+  ]},
+  music: { label: "🎵 Albums — Release Year", prompt: "Oldest to newest", questions: [
+    { items: ["Abbey Road (Beatles)","Thriller (Jackson)","The Eminem Show","Lemonade (Beyonce)"], hint:"Order by release year, oldest first" },
+    { items: ["Led Zeppelin IV","Purple Rain (Prince)","The Slim Shady LP","Adele - 21"], hint:"Order by release year, oldest first" },
+    { items: ["Dark Side of the Moon","Born in the USA (Springsteen)","Nevermind (Nirvana)","Fearless (T. Swift)"], hint:"Order by release year, oldest first" },
+    { items: ["Rumours (Fleetwood Mac)","Graceland (Paul Simon)","Jagged Little Pill (Alanis)","Get Rich or Die Tryin'"], hint:"Order by release year, oldest first" },
+    { items: ["Pet Sounds (Beach Boys)","Hotel California (Eagles)","The Chronic (Dr. Dre)","21 Adele"], hint:"Order by release year, oldest first" }
+  ]},
+  buildings: { label: "🏢 Buildings — Height", prompt: "Shortest to tallest", questions: [
+    { items: ["Eiffel Tower","Empire State Building","One World Trade Center","Burj Khalifa"], hint:"Order by height, shortest first" },
+    { items: ["Washington Monument","Chrysler Building","CN Tower","Shanghai Tower"], hint:"Order by height, shortest first" },
+    { items: ["Leaning Tower of Pisa","Eiffel Tower","Taipei 101","Burj Khalifa"], hint:"Order by height, shortest first" },
+    { items: ["Big Ben","Empire State Building","Petronas Towers","Makkah Royal Clock Tower"], hint:"Order by height, shortest first" },
+    { items: ["Statue of Liberty","Eiffel Tower","One World Trade Center","Burj Khalifa"], hint:"Order by height, shortest first" }
+  ]},
+  sports: { label: "🏅 Sports Records & Events", prompt: "Earliest to most recent", questions: [
+    { items: ["First Modern Olympics","First Super Bowl","First FIFA World Cup Final on TV","Michael Jordan's 6th Championship"], hint:"Order by when it happened, earliest first" },
+    { items: ["Babe Ruth's 60 Home Runs","Roger Bannister 4-min Mile","Muhammad Ali vs Frazier I","Michael Phelps 8 Gold Medals"], hint:"Order by when it happened, earliest first" },
+    { items: ["Jesse Owens 4 Golds (Olympics)","First NBA Season","First Wimbledon on TV","LeBron's First Championship"], hint:"Order by when it happened, earliest first" },
+    { items: ["First Baseball World Series","First NFL Championship","First NBA Finals","First Soccer World Cup"], hint:"Order by when it happened, earliest first" },
+    { items: ["Jim Thorpe Olympics Gold","Wilt Chamberlain 100-pt Game","Secretariat Triple Crown","Serena Williams First Slam"], hint:"Order by when it happened, earliest first" }
+  ]},
+  science: { label: "🔬 Scientific Discoveries", prompt: "Earliest to most recent", questions: [
+    { items: ["Gravity (Newton)","Evolution Theory (Darwin)","Penicillin (Fleming)","DNA Structure (Watson/Crick)"], hint:"Order by discovery date, earliest first" },
+    { items: ["Electricity (Franklin)","Periodic Table (Mendeleev)","Theory of Relativity (Einstein)","Higgs Boson Confirmed"], hint:"Order by discovery date, earliest first" },
+    { items: ["Heliocentrism (Copernicus)","Laws of Motion (Newton)","Germ Theory (Pasteur)","Human Genome Mapped"], hint:"Order by discovery date, earliest first" },
+    { items: ["Oxygen Discovered","Vaccination (Jenner)","X-Rays (Roentgen)","Nuclear Fission"], hint:"Order by discovery date, earliest first" },
+    { items: ["Calculus (Newton/Leibniz)","Electrons Discovered","Quantum Theory (Planck)","Black Hole Photographed"], hint:"Order by discovery date, earliest first" }
+  ]}
+};
+
 // ── TRIVIA DATABASE ──
 const TRIVIA_DB = {
   movies: { label: "🎬 Movies", questions: [
@@ -599,6 +848,103 @@ const TRIVIA_DB = {
     { q:"What year was the Google logo first introduced?", options:["1995","1997","1998","2000"], correct:2, difficulty:5 }
   ]}
 };
+
+
+// ── SORT IT: CATEGORIES ──
+app.get('/sortit/categories', (req, res) => {
+  res.json(Object.entries(SORT_DB).map(([key, val]) => ({ key, label: val.label, prompt: val.prompt })));
+});
+
+// ── SORT IT: START ──
+app.post('/sortit/start', (req, res) => {
+  if (!verifyHost(req, res)) return;
+  const { category, timeLimit, immunityType } = req.body;
+  const cat = SORT_DB[category];
+  if (!cat) return res.status(400).json({ error: 'Unknown category' });
+
+  // Pick random question
+  const q = cat.questions[Math.floor(Math.random() * cat.questions.length)];
+  // Shuffle items for players
+  const shuffled = [...q.items].sort(() => Math.random() - 0.5);
+
+  gameState.sortChallenge = {
+    category, categoryLabel: cat.label,
+    prompt: cat.prompt,
+    correctOrder: q.items,      // correct answer (server only for scoring)
+    shuffledItems: shuffled,    // what players see
+    hint: q.hint,
+    playerAnswers: {},          // { playerName: [ordered items] }
+    scores: {},                 // { playerName: points }
+    revealed: false,
+    timeLimit: timeLimit || 45,
+    immunityType: immunityType || 'individual',
+    startedAt: Date.now(),
+    ended: false,
+  };
+  gameState.phase = 'challenge';
+  gameState.currentChallenge = { name: cat.label, type: 'sortit' };
+  gameState.immuneNames = [];
+  gameState.pictureChallenge = null;
+  gameState.triviaChallenge = null;
+  gameState.updatedAt = Date.now();
+  res.json({ ok: true });
+});
+
+// ── SORT IT: SUBMIT ANSWER ──
+app.post('/sortit/answer', (req, res) => {
+  const { playerName, orderedItems } = req.body;
+  const sc = gameState.sortChallenge;
+  if (!sc || sc.ended) return res.status(400).json({ error: 'No active challenge' });
+  if (sc.playerAnswers[playerName]) return res.json({ ok: true, alreadyAnswered: true });
+
+  sc.playerAnswers[playerName] = orderedItems;
+
+  // Score: count correct positions
+  let correct = 0;
+  orderedItems.forEach((item, i) => { if (item === sc.correctOrder[i]) correct++; });
+  const pts = correct === 4 ? 3 : correct === 3 ? 2 : correct >= 2 ? 1 : 0;
+  sc.scores[playerName] = pts;
+  gameState.updatedAt = Date.now();
+  res.json({ ok: true, correct, pts });
+});
+
+// ── SORT IT: REVEAL (host) ──
+app.post('/sortit/reveal', (req, res) => {
+  if (!verifyHost(req, res)) return;
+  const sc = gameState.sortChallenge;
+  if (!sc) return res.status(400).json({ error: 'No challenge' });
+  sc.revealed = true;
+  gameState.updatedAt = Date.now();
+  res.json({ ok: true, correctOrder: sc.correctOrder });
+});
+
+// ── SORT IT: END ──
+app.post('/sortit/end', (req, res) => {
+  if (!verifyHost(req, res)) return;
+  const sc = gameState.sortChallenge;
+  if (!sc) return res.status(400).json({ error: 'No challenge' });
+  sc.ended = true;
+  const { scores, immunityType } = sc;
+  let immuneNames = [];
+  if (immunityType === 'team') {
+    const ts = {};
+    gameState.teams.forEach(t => ts[t] = 0);
+    gameState.players.filter(p => !p.eliminated).forEach(p => {
+      if (p.team) ts[p.team] = (ts[p.team] || 0) + (scores[p.name] || 0);
+    });
+    const max = Math.max(...Object.values(ts));
+    const winTeams = Object.entries(ts).filter(([, s]) => s === max).map(([t]) => t);
+    immuneNames = gameState.players.filter(p => !p.eliminated && winTeams.includes(p.team)).map(p => p.name);
+  } else {
+    const max = Math.max(...Object.values(scores), 0);
+    immuneNames = Object.entries(scores).filter(([, s]) => s === max).map(([n]) => n);
+  }
+  gameState.immuneNames = immuneNames;
+  gameState.players.forEach(p => { p.immune = immuneNames.includes(p.name); });
+  gameState.votingPool = gameState.players.filter(p => !p.eliminated && !p.immune).map(p => p.name);
+  gameState.updatedAt = Date.now();
+  res.json({ ok: true, scores, immuneNames, correctOrder: sc.correctOrder });
+});
 
 app.get('/trivia/categories', (req, res) => {
   res.json(Object.entries(TRIVIA_DB).map(([key, val]) => ({ key, label: val.label })));
