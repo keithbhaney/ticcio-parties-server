@@ -308,6 +308,377 @@ app.post('/reset', (req, res) => {
   gameState = defaultState(); res.json({ ok: true });
 });
 
+
+// ── TRIVIA DATABASE ──
+// 10 categories, 5 questions each, easy→hard, multiple choice (4 options, index of correct)
+const TRIVIA_DB = {
+  movies: {
+    label: "🎬 Movies",
+    questions: [
+      { q:"Which movie features the line 'You're gonna need a bigger boat'?", options:["Jaws","Titanic","The Abyss","Sharknado"], correct:0, difficulty:1 },
+      { q:"Who directed Jurassic Park?", options:["James Cameron","Steven Spielberg","George Lucas","Ridley Scott"], correct:1, difficulty:2 },
+      { q:"Which film won the first Academy Award for Best Picture?", options:["Gone with the Wind","Wings","Casablanca","Ben-Hur"], correct:1, difficulty:3 },
+      { q:"What year was The Godfather released?", options:["1969","1970","1972","1974"], correct:2, difficulty:4 },
+      { q:"Which director made both Schindler's List and Saving Private Ryan?", options:["Martin Scorsese","Francis Ford Coppola","Steven Spielberg","Stanley Kubrick"], correct:2, difficulty:5 }
+    ]
+  },
+  tv_shows: {
+    label: "📺 TV Shows",
+    questions: [
+      { q:"What is the name of the coffee shop in Friends?", options:["The Perk","Central Perk","Java Hut","Cafe Mocha"], correct:1, difficulty:1 },
+      { q:"Which show features Walter White?", options:["Better Call Saul","Ozark","Breaking Bad","The Wire"], correct:2, difficulty:1 },
+      { q:"How many seasons does Game of Thrones have?", options:["6","7","8","9"], correct:2, difficulty:2 },
+      { q:"What network originally aired The Sopranos?", options:["AMC","Netflix","Showtime","HBO"], correct:3, difficulty:3 },
+      { q:"Which show coined the term 'jumping the shark'?", options:["Happy Days","Fonzie","Laverne & Shirley","Mork & Mindy"], correct:0, difficulty:5 }
+    ]
+  },
+  musicians: {
+    label: "🎵 Musicians",
+    questions: [
+      { q:"Which band sang 'Bohemian Rhapsody'?", options:["Led Zeppelin","Queen","The Beatles","Aerosmith"], correct:1, difficulty:1 },
+      { q:"What is Michael Jackson's best-selling album?", options:["Bad","Off the Wall","Thriller","Dangerous"], correct:2, difficulty:1 },
+      { q:"Which artist has the most Grammy wins of all time?", options:["Beyoncé","Taylor Swift","Georg Solti","Paul McCartney"], correct:2, difficulty:3 },
+      { q:"What was Elvis Presley's first number one hit?", options:["Hound Dog","Heartbreak Hotel","Jailhouse Rock","Blue Suede Shoes"], correct:1, difficulty:4 },
+      { q:"Which musician's real name is Stefani Joanne Angelina Germanotta?", options:["Katy Perry","Lady Gaga","Billie Eilish","Adele"], correct:1, difficulty:2 }
+    ]
+  },
+  politicians: {
+    label: "🏛️ Politicians",
+    questions: [
+      { q:"Who was the first President of the United States?", options:["John Adams","Benjamin Franklin","Thomas Jefferson","George Washington"], correct:3, difficulty:1 },
+      { q:"Which country did Winston Churchill lead during WWII?", options:["Australia","Canada","United Kingdom","United States"], correct:2, difficulty:1 },
+      { q:"How many terms did Franklin D. Roosevelt serve as US President?", options:["2","3","4","5"], correct:2, difficulty:3 },
+      { q:"Who was the first female Prime Minister of the UK?", options:["Theresa May","Angela Merkel","Margaret Thatcher","Hillary Clinton"], correct:2, difficulty:2 },
+      { q:"Nelson Mandela was imprisoned on which island?", options:["Alcatraz","Ellis Island","Robben Island","Devil's Island"], correct:2, difficulty:3 }
+    ]
+  },
+  cities: {
+    label: "🌆 Cities",
+    questions: [
+      { q:"What is the capital of Australia?", options:["Sydney","Melbourne","Brisbane","Canberra"], correct:3, difficulty:2 },
+      { q:"Which city is known as 'The City of Light'?", options:["Rome","London","Paris","Vienna"], correct:2, difficulty:1 },
+      { q:"What is the most populous city in the world?", options:["Mumbai","Shanghai","Tokyo","Beijing"], correct:2, difficulty:2 },
+      { q:"Which city hosted the 2016 Summer Olympics?", options:["London","Rio de Janeiro","Tokyo","Athens"], correct:1, difficulty:2 },
+      { q:"What is the oldest continuously inhabited city in the world?", options:["Rome","Athens","Damascus","Cairo"], correct:2, difficulty:5 }
+    ]
+  },
+  foods: {
+    label: "🍕 Foods",
+    questions: [
+      { q:"What country did pizza originate from?", options:["Greece","France","Italy","Spain"], correct:2, difficulty:1 },
+      { q:"What is the main ingredient in guacamole?", options:["Tomato","Avocado","Lime","Onion"], correct:1, difficulty:1 },
+      { q:"Which spice is the most expensive in the world by weight?", options:["Vanilla","Cardamom","Saffron","Truffle"], correct:2, difficulty:3 },
+      { q:"What type of pastry is a croissant?", options:["Choux","Puff","Shortcrust","Laminated"], correct:3, difficulty:4 },
+      { q:"Worcestershire sauce was originally created in which city?", options:["London","Worcester","Birmingham","Bristol"], correct:1, difficulty:5 }
+    ]
+  },
+  athletes: {
+    label: "🏆 Athletes",
+    questions: [
+      { q:"How many Olympic gold medals did Michael Phelps win?", options:["18","21","23","28"], correct:2, difficulty:2 },
+      { q:"Which country does Lionel Messi play for?", options:["Brazil","Spain","Portugal","Argentina"], correct:3, difficulty:1 },
+      { q:"Usain Bolt's world record 100m time is approximately:", options:["9.58 sec","9.72 sec","9.84 sec","10.01 sec"], correct:0, difficulty:3 },
+      { q:"Which tennis player has won the most Grand Slam titles (men's)?", options:["Roger Federer","Rafael Nadal","Novak Djokovic","Pete Sampras"], correct:2, difficulty:3 },
+      { q:"Muhammad Ali's original name before converting to Islam was:", options:["Cassius Clay","Rubin Carter","Joe Louis","Sugar Ray Robinson"], correct:0, difficulty:2 }
+    ]
+  },
+  paintings: {
+    label: "🖼️ Famous Paintings",
+    questions: [
+      { q:"Who painted the Mona Lisa?", options:["Michelangelo","Raphael","Leonardo da Vinci","Botticelli"], correct:2, difficulty:1 },
+      { q:"In which museum is the Mona Lisa displayed?", options:["The Met","The Louvre","The Prado","The Uffizi"], correct:1, difficulty:2 },
+      { q:"Who painted The Starry Night?", options:["Paul Gauguin","Pablo Picasso","Claude Monet","Vincent van Gogh"], correct:3, difficulty:1 },
+      { q:"The Scream was painted by which Norwegian artist?", options:["Edvard Munch","Gustav Klimt","Egon Schiele","Ernst Kirchner"], correct:0, difficulty:2 },
+      { q:"Which movement is Salvador Dalí associated with?", options:["Cubism","Impressionism","Surrealism","Dadaism"], correct:2, difficulty:3 }
+    ]
+  },
+  animals: {
+    label: "🐾 Animals",
+    questions: [
+      { q:"What is the fastest land animal?", options:["Lion","Cheetah","Pronghorn","Greyhound"], correct:1, difficulty:1 },
+      { q:"How many hearts does an octopus have?", options:["1","2","3","4"], correct:2, difficulty:3 },
+      { q:"What is the only mammal capable of true flight?", options:["Flying squirrel","Sugar glider","Bat","Flying lemur"], correct:2, difficulty:2 },
+      { q:"A group of flamingos is called a:", options:["Flock","Colony","Flamboyance","Gaggle"], correct:2, difficulty:4 },
+      { q:"Which animal has the highest blood pressure?", options:["Blue whale","Elephant","Giraffe","Horse"], correct:2, difficulty:5 }
+    ]
+  },
+  logos: {
+    label: "🏢 Company Logos",
+    questions: [
+      { q:"Which company uses a bitten apple as its logo?", options:["Google","Amazon","Apple","Microsoft"], correct:2, difficulty:1 },
+      { q:"What color is the Netflix logo?", options:["Blue","Green","Red","Orange"], correct:2, difficulty:1 },
+      { q:"The Amazon logo has an arrow pointing from A to Z. What does it symbolize?", options:["Speed","Everything from A to Z","A smile","Growth"], correct:1, difficulty:3 },
+      { q:"Which company's logo is a stylized bird?", options:["Facebook","Instagram","Twitter/X","Snapchat"], correct:2, difficulty:2 },
+      { q:"What year was the Google logo first introduced?", options:["1995","1997","1998","2000"], correct:2, difficulty:5 }
+    ]
+  }
+};
+
+// ── TRIVIA: GET CATEGORIES ──
+app.get('/trivia/categories', (req, res) => {
+  const cats = Object.entries(TRIVIA_DB).map(([key, val]) => ({ key, label: val.label, count: val.questions.length }));
+  res.json(cats);
+});
+
+// ── TRIVIA: START ──
+app.post('/trivia/start', (req, res) => {
+  if (!verifyHost(req, res)) return;
+  const { category, timePerQ, immunityType } = req.body;
+  const cat = TRIVIA_DB[category];
+  if (!cat) return res.status(400).json({ error: 'Unknown category' });
+
+  const questions = [...cat.questions].sort((a, b) => a.difficulty - b.difficulty);
+  gameState.triviaChallenge = {
+    category, categoryLabel: cat.label,
+    questions: questions.map(q => ({ q: q.q, options: q.options, correct: q.correct })),
+    currentQ: 0,           // which question we're on (0-4)
+    playerAnswers: {},     // { playerName: [answerIndex, ...] }
+    playerTimes: {},       // { playerName: [secondsTaken, ...] }
+    scores: {},            // { playerName: totalPoints }
+    timePerQ: timePerQ || 15,
+    immunityType: immunityType || 'individual',
+    qStartedAt: Date.now(),
+    ended: false,
+  };
+  gameState.phase = 'challenge';
+  gameState.currentChallenge = { name: cat.label + ' Trivia', type: 'trivia' };
+  gameState.immuneNames = [];
+  gameState.pictureChallenge = null;
+  gameState.updatedAt = Date.now();
+  res.json({ ok: true });
+});
+
+// ── TRIVIA: NEXT QUESTION (host advances) ──
+app.post('/trivia/next', (req, res) => {
+  if (!verifyHost(req, res)) return;
+  if (!gameState?.triviaChallenge) return res.status(400).json({ error: 'No trivia active' });
+  const tc = gameState.triviaChallenge;
+  if (tc.currentQ >= tc.questions.length - 1) {
+    tc.ended = true;
+  } else {
+    tc.currentQ++;
+    tc.qStartedAt = Date.now();
+  }
+  gameState.updatedAt = Date.now();
+  res.json({ ok: true, currentQ: tc.currentQ, ended: tc.ended });
+});
+
+// ── TRIVIA: SUBMIT ANSWER ──
+app.post('/trivia/answer', (req, res) => {
+  const { playerName, answerIndex, timeTaken } = req.body;
+  if (!gameState?.triviaChallenge) return res.status(400).json({ error: 'No trivia active' });
+  const tc = gameState.triviaChallenge;
+  if (tc.ended) return res.status(400).json({ error: 'Trivia ended' });
+
+  if (!tc.playerAnswers[playerName]) tc.playerAnswers[playerName] = [];
+  if (!tc.playerTimes[playerName]) tc.playerTimes[playerName] = [];
+
+  const qIdx = tc.currentQ;
+  // Only accept first answer per question
+  if (tc.playerAnswers[playerName][qIdx] !== undefined) {
+    return res.json({ ok: true, alreadyAnswered: true });
+  }
+
+  tc.playerAnswers[playerName][qIdx] = answerIndex;
+  tc.playerTimes[playerName][qIdx] = timeTaken || tc.timePerQ;
+
+  // Score: correct answer earns points based on speed
+  const correct = tc.questions[qIdx].correct === answerIndex;
+  let pts = 0;
+  if (correct) {
+    if (timeTaken <= 5) pts = 3;
+    else if (timeTaken <= 10) pts = 2;
+    else pts = 1;
+  }
+  if (!tc.scores[playerName]) tc.scores[playerName] = 0;
+  tc.scores[playerName] += pts;
+
+  gameState.updatedAt = Date.now();
+  res.json({ ok: true, correct, pts, correctIndex: tc.questions[qIdx].correct });
+});
+
+// ── TRIVIA: END + AWARD IMMUNITY ──
+app.post('/trivia/end', (req, res) => {
+  if (!verifyHost(req, res)) return;
+  if (!gameState?.triviaChallenge) return res.status(400).json({ error: 'No trivia' });
+  gameState.triviaChallenge.ended = true;
+  const { scores, immunityType } = gameState.triviaChallenge;
+  let immuneNames = [];
+
+  if (immunityType === 'team') {
+    const teamScores = {};
+    gameState.teams.forEach(t => teamScores[t] = 0);
+    gameState.players.filter(p => !p.eliminated).forEach(p => {
+      if (p.team) teamScores[p.team] = (teamScores[p.team] || 0) + (scores[p.name] || 0);
+    });
+    const maxTeam = Math.max(...Object.values(teamScores));
+    const winTeams = Object.entries(teamScores).filter(([, s]) => s === maxTeam).map(([t]) => t);
+    immuneNames = gameState.players.filter(p => !p.eliminated && winTeams.includes(p.team)).map(p => p.name);
+  } else {
+    const maxScore = Math.max(...Object.values(scores), 0);
+    immuneNames = Object.entries(scores).filter(([, s]) => s === maxScore).map(([n]) => n);
+  }
+
+  gameState.immuneNames = immuneNames;
+  gameState.players.forEach(p => { p.immune = immuneNames.includes(p.name); });
+  gameState.votingPool = gameState.players.filter(p => !p.eliminated && !p.immune).map(p => p.name);
+  gameState.updatedAt = Date.now();
+  res.json({ ok: true, scores, immuneNames });
+});
+
+// ── TRIVIA DATABASE ──
+const TRIVIA_DB = {
+  movies: { label: "🎬 Movies", questions: [
+    { q:"Which movie features 'You're gonna need a bigger boat'?", options:["Jaws","Titanic","The Abyss","Sharknado"], correct:0, difficulty:1 },
+    { q:"Who directed Jurassic Park?", options:["James Cameron","Steven Spielberg","George Lucas","Ridley Scott"], correct:1, difficulty:2 },
+    { q:"Which film won the first Academy Award for Best Picture?", options:["Gone with the Wind","Wings","Casablanca","Ben-Hur"], correct:1, difficulty:3 },
+    { q:"What year was The Godfather released?", options:["1969","1970","1972","1974"], correct:2, difficulty:4 },
+    { q:"Who directed both Schindler's List and Saving Private Ryan?", options:["Martin Scorsese","Francis Ford Coppola","Steven Spielberg","Stanley Kubrick"], correct:2, difficulty:5 }
+  ]},
+  tv_shows: { label: "📺 TV Shows", questions: [
+    { q:"What is the coffee shop in Friends called?", options:["The Perk","Central Perk","Java Hut","Cafe Mocha"], correct:1, difficulty:1 },
+    { q:"Which show features Walter White?", options:["Better Call Saul","Ozark","Breaking Bad","The Wire"], correct:2, difficulty:1 },
+    { q:"How many seasons does Game of Thrones have?", options:["6","7","8","9"], correct:2, difficulty:2 },
+    { q:"What network originally aired The Sopranos?", options:["AMC","Netflix","Showtime","HBO"], correct:3, difficulty:3 },
+    { q:"Which show coined the term 'jumping the shark'?", options:["Happy Days","Laverne & Shirley","Mork & Mindy","Three's Company"], correct:0, difficulty:5 }
+  ]},
+  musicians: { label: "🎵 Musicians", questions: [
+    { q:"Which band sang 'Bohemian Rhapsody'?", options:["Led Zeppelin","Queen","The Beatles","Aerosmith"], correct:1, difficulty:1 },
+    { q:"What is Michael Jackson's best-selling album?", options:["Bad","Off the Wall","Thriller","Dangerous"], correct:2, difficulty:1 },
+    { q:"Which artist has the most Grammy wins ever?", options:["Beyonce","Taylor Swift","Georg Solti","Paul McCartney"], correct:2, difficulty:3 },
+    { q:"What was Elvis Presley's first #1 hit?", options:["Hound Dog","Heartbreak Hotel","Jailhouse Rock","Blue Suede Shoes"], correct:1, difficulty:4 },
+    { q:"Lady Gaga's real name is:", options:["Stefani Germanotta","Robyn Fenty","Belcalis Almanzar","Alecia Moore"], correct:0, difficulty:2 }
+  ]},
+  politicians: { label: "🏛️ Politicians", questions: [
+    { q:"Who was the first US President?", options:["John Adams","Benjamin Franklin","Thomas Jefferson","George Washington"], correct:3, difficulty:1 },
+    { q:"Which country did Churchill lead in WWII?", options:["Australia","Canada","United Kingdom","United States"], correct:2, difficulty:1 },
+    { q:"How many terms did FDR serve as US President?", options:["2","3","4","5"], correct:2, difficulty:3 },
+    { q:"Who was the first female Prime Minister of the UK?", options:["Theresa May","Angela Merkel","Margaret Thatcher","Hillary Clinton"], correct:2, difficulty:2 },
+    { q:"Mandela was imprisoned on which island?", options:["Alcatraz","Ellis Island","Robben Island","Devil's Island"], correct:2, difficulty:3 }
+  ]},
+  cities: { label: "🌆 Cities", questions: [
+    { q:"What is the capital of Australia?", options:["Sydney","Melbourne","Brisbane","Canberra"], correct:3, difficulty:2 },
+    { q:"Which city is called 'The City of Light'?", options:["Rome","London","Paris","Vienna"], correct:2, difficulty:1 },
+    { q:"What is the most populous city in the world?", options:["Mumbai","Shanghai","Tokyo","Beijing"], correct:2, difficulty:2 },
+    { q:"Which city hosted the 2016 Summer Olympics?", options:["London","Rio de Janeiro","Tokyo","Athens"], correct:1, difficulty:2 },
+    { q:"What is the oldest continuously inhabited city?", options:["Rome","Athens","Damascus","Cairo"], correct:2, difficulty:5 }
+  ]},
+  foods: { label: "🍕 Foods", questions: [
+    { q:"Where did pizza originate?", options:["Greece","France","Italy","Spain"], correct:2, difficulty:1 },
+    { q:"What is the main ingredient in guacamole?", options:["Tomato","Avocado","Lime","Onion"], correct:1, difficulty:1 },
+    { q:"Which spice is the most expensive by weight?", options:["Vanilla","Cardamom","Saffron","Truffle"], correct:2, difficulty:3 },
+    { q:"What type of pastry is a croissant?", options:["Choux","Puff","Shortcrust","Laminated"], correct:3, difficulty:4 },
+    { q:"Worcestershire sauce originated in which city?", options:["London","Worcester","Birmingham","Bristol"], correct:1, difficulty:5 }
+  ]},
+  athletes: { label: "🏆 Athletes", questions: [
+    { q:"How many Olympic gold medals did Michael Phelps win?", options:["18","21","23","28"], correct:2, difficulty:2 },
+    { q:"Which country does Lionel Messi play for?", options:["Brazil","Spain","Portugal","Argentina"], correct:3, difficulty:1 },
+    { q:"Usain Bolt's world record 100m time is approximately:", options:["9.58 sec","9.72 sec","9.84 sec","10.01 sec"], correct:0, difficulty:3 },
+    { q:"Who has won the most men's Grand Slam titles?", options:["Roger Federer","Rafael Nadal","Novak Djokovic","Pete Sampras"], correct:2, difficulty:3 },
+    { q:"Muhammad Ali's birth name was:", options:["Cassius Clay","Rubin Carter","Joe Louis","Sugar Ray Robinson"], correct:0, difficulty:2 }
+  ]},
+  paintings: { label: "🖼️ Famous Paintings", questions: [
+    { q:"Who painted the Mona Lisa?", options:["Michelangelo","Raphael","Leonardo da Vinci","Botticelli"], correct:2, difficulty:1 },
+    { q:"Where is the Mona Lisa displayed?", options:["The Met","The Louvre","The Prado","The Uffizi"], correct:1, difficulty:2 },
+    { q:"Who painted The Starry Night?", options:["Paul Gauguin","Pablo Picasso","Claude Monet","Vincent van Gogh"], correct:3, difficulty:1 },
+    { q:"The Scream was painted by which artist?", options:["Edvard Munch","Gustav Klimt","Egon Schiele","Ernst Kirchner"], correct:0, difficulty:2 },
+    { q:"Which movement is Salvador Dali associated with?", options:["Cubism","Impressionism","Surrealism","Dadaism"], correct:2, difficulty:3 }
+  ]},
+  animals: { label: "🐾 Animals", questions: [
+    { q:"What is the fastest land animal?", options:["Lion","Cheetah","Pronghorn","Greyhound"], correct:1, difficulty:1 },
+    { q:"How many hearts does an octopus have?", options:["1","2","3","4"], correct:2, difficulty:3 },
+    { q:"What is the only mammal capable of true flight?", options:["Flying squirrel","Sugar glider","Bat","Flying lemur"], correct:2, difficulty:2 },
+    { q:"A group of flamingos is called a:", options:["Flock","Colony","Flamboyance","Gaggle"], correct:2, difficulty:4 },
+    { q:"Which animal has the highest blood pressure?", options:["Blue whale","Elephant","Giraffe","Horse"], correct:2, difficulty:5 }
+  ]},
+  logos: { label: "🏢 Company Logos", questions: [
+    { q:"Which company uses a bitten apple as its logo?", options:["Google","Amazon","Apple","Microsoft"], correct:2, difficulty:1 },
+    { q:"What color is the Netflix logo?", options:["Blue","Green","Red","Orange"], correct:2, difficulty:1 },
+    { q:"The Amazon logo arrow from A to Z symbolizes:", options:["Speed","Everything A to Z","A smile","Growth"], correct:1, difficulty:3 },
+    { q:"Which company's logo is a stylized bird?", options:["Facebook","Instagram","Twitter/X","Snapchat"], correct:2, difficulty:2 },
+    { q:"What year was the Google logo first introduced?", options:["1995","1997","1998","2000"], correct:2, difficulty:5 }
+  ]}
+};
+
+app.get('/trivia/categories', (req, res) => {
+  res.json(Object.entries(TRIVIA_DB).map(([key, val]) => ({ key, label: val.label })));
+});
+
+app.post('/trivia/start', (req, res) => {
+  if (!verifyHost(req, res)) return;
+  const { category, timePerQ, immunityType } = req.body;
+  const cat = TRIVIA_DB[category];
+  if (!cat) return res.status(400).json({ error: 'Unknown category' });
+  const questions = [...cat.questions].sort((a, b) => a.difficulty - b.difficulty);
+  gameState.triviaChallenge = {
+    category, categoryLabel: cat.label,
+    questions: questions.map(q => ({ q: q.q, options: q.options, correct: q.correct })),
+    currentQ: 0,
+    playerAnswers: {}, playerTimes: {}, scores: {},
+    timePerQ: timePerQ || 15,
+    immunityType: immunityType || 'individual',
+    qStartedAt: Date.now(),
+    ended: false,
+  };
+  gameState.phase = 'challenge';
+  gameState.currentChallenge = { name: cat.label + ' Trivia', type: 'trivia' };
+  gameState.immuneNames = []; gameState.pictureChallenge = null;
+  gameState.updatedAt = Date.now();
+  res.json({ ok: true });
+});
+
+app.post('/trivia/next', (req, res) => {
+  if (!verifyHost(req, res)) return;
+  const tc = gameState.triviaChallenge;
+  if (!tc) return res.status(400).json({ error: 'No trivia' });
+  if (tc.currentQ >= tc.questions.length - 1) { tc.ended = true; }
+  else { tc.currentQ++; tc.qStartedAt = Date.now(); }
+  gameState.updatedAt = Date.now();
+  res.json({ ok: true, currentQ: tc.currentQ, ended: tc.ended });
+});
+
+app.post('/trivia/answer', (req, res) => {
+  const { playerName, answerIndex, timeTaken } = req.body;
+  const tc = gameState.triviaChallenge;
+  if (!tc || tc.ended) return res.status(400).json({ error: 'No active trivia' });
+  const qIdx = tc.currentQ;
+  if (!tc.playerAnswers[playerName]) tc.playerAnswers[playerName] = [];
+  if (tc.playerAnswers[playerName][qIdx] !== undefined) return res.json({ ok: true, alreadyAnswered: true });
+  tc.playerAnswers[playerName][qIdx] = answerIndex;
+  const t = timeTaken || tc.timePerQ;
+  const correct = tc.questions[qIdx].correct === answerIndex;
+  let pts = 0;
+  if (correct) { pts = t <= 5 ? 3 : t <= 10 ? 2 : 1; }
+  tc.scores[playerName] = (tc.scores[playerName] || 0) + pts;
+  gameState.updatedAt = Date.now();
+  res.json({ ok: true, correct, pts, correctIndex: tc.questions[qIdx].correct });
+});
+
+app.post('/trivia/end', (req, res) => {
+  if (!verifyHost(req, res)) return;
+  const tc = gameState.triviaChallenge;
+  if (!tc) return res.status(400).json({ error: 'No trivia' });
+  tc.ended = true;
+  const { scores, immunityType } = tc;
+  let immuneNames = [];
+  if (immunityType === 'team') {
+    const ts = {};
+    gameState.teams.forEach(t => ts[t] = 0);
+    gameState.players.filter(p => !p.eliminated).forEach(p => { if (p.team) ts[p.team] = (ts[p.team]||0) + (scores[p.name]||0); });
+    const max = Math.max(...Object.values(ts));
+    const winTeams = Object.entries(ts).filter(([,s]) => s===max).map(([t]) => t);
+    immuneNames = gameState.players.filter(p => !p.eliminated && winTeams.includes(p.team)).map(p => p.name);
+  } else {
+    const max = Math.max(...Object.values(scores), 0);
+    immuneNames = Object.entries(scores).filter(([,s]) => s===max).map(([n]) => n);
+  }
+  gameState.immuneNames = immuneNames;
+  gameState.players.forEach(p => { p.immune = immuneNames.includes(p.name); });
+  gameState.votingPool = gameState.players.filter(p => !p.eliminated && !p.immune).map(p => p.name);
+  gameState.updatedAt = Date.now();
+  res.json({ ok: true, scores, immuneNames });
+});
+
 app.get('/', (req, res) => res.json({ status: 'Ticcio Parties 🔥', round: gameState?.round || 0 }));
 
 app.listen(PORT, () => console.log(`Ticcio Parties server on port ${PORT}`));
