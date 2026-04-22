@@ -66,7 +66,7 @@ function defaultState() {
     gameName: 'Ticcio Survivor', hostPass: 'ticcio', phase: 'active', round: 1,
     eliminationMode: 'individual', teams: [], players: [], votes: {},
     votingPool: [], immuneNames: [], currentChallenge: null, pictureChallenge: null,
-    revealed: false, elimHistory: [], updatedAt: Date.now(),
+    revealed: false, doubleElim: false, revealCount: 0, elimHistory: [], updatedAt: Date.now(),
   };
 }
 
@@ -232,7 +232,10 @@ app.post('/voting/open', (req, res) => {
   if (!verifyHost(req, res)) return;
   gameState.phase = 'voting'; gameState.votes = {};
   gameState.players.forEach(p => { p.votes = 0; });
-  gameState.revealed = false; gameState.updatedAt = Date.now();
+  gameState.revealed = false;
+  gameState.doubleElim = req.body.doubleElim || false;
+  gameState.revealCount = 0;
+  gameState.updatedAt = Date.now();
   res.json({ ok: true });
 });
 
@@ -250,11 +253,43 @@ app.post('/voting/reveal', (req, res) => {
   if (!verifyHost(req, res)) return;
   const active = gameState.players.filter(p => !p.eliminated);
   if (!active.length) return res.status(400).json({ error: 'No players' });
-  const top = active.reduce((a, b) => b.votes > a.votes ? b : a, active[0]);
-  top.eliminated = true;
-  gameState.elimHistory.push({ name: top.name, team: top.team, round: gameState.round, votes: top.votes });
-  gameState.revealed = true; gameState.updatedAt = Date.now();
-  res.json({ ok: true, eliminated: top });
+
+  // Sort by votes descending
+  const sorted = [...active].sort((a, b) => b.votes - a.votes);
+  const revealNum = (gameState.revealCount || 0) + 1;
+
+  let target;
+  if (revealNum === 1) {
+    // First reveal: most votes
+    target = sorted[0];
+  } else {
+    // Second reveal: second most votes (already eliminated first)
+    const stillAlive = gameState.players.filter(p => !p.eliminated);
+    if (!stillAlive.length) return res.status(400).json({ error: 'No players left' });
+    target = stillAlive.sort((a, b) => b.votes - a.votes)[0];
+  }
+
+  target.eliminated = true;
+  gameState.elimHistory.push({ name: target.name, team: target.team, round: gameState.round, votes: target.votes, revealNum });
+  gameState.revealCount = revealNum;
+  gameState.revealed = true;
+
+  // Done if single elim, or second reveal of double elim
+  const isDone = !gameState.doubleElim || revealNum >= 2;
+  if (isDone) gameState.phase = 'reveal'; // stays reveal until host advances
+
+  gameState.updatedAt = Date.now();
+  res.json({ ok: true, eliminated: target, revealNum, doubleElim: gameState.doubleElim, isDone });
+});
+
+// ── MERGE TRIBES ──
+app.post('/merge', (req, res) => {
+  if (!verifyHost(req, res)) return;
+  const tribeName = req.body.tribeName || 'No Mercy';
+  gameState.teams = [tribeName];
+  gameState.players.forEach(p => { if (!p.eliminated) p.team = tribeName; });
+  gameState.updatedAt = Date.now();
+  res.json({ ok: true, tribeName });
 });
 
 app.post('/round/next', (req, res) => {
