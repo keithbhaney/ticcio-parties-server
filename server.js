@@ -506,17 +506,20 @@ app.post('/sortit/start', (req, res) => {
 
   // Pick random question
   const q = cat.questions[Math.floor(Math.random() * cat.questions.length)];
-  // Shuffle items for players
-  const shuffled = [...q.items].sort(() => Math.random() - 0.5);
+  // Strip parenthetical hints from display (e.g. "Star Wars (1977)" -> "Star Wars")
+  const displayItems = q.items.map(item => item.replace(/\s*\([^)]+\)\s*$/, '').trim());
+  // Shuffle display items — track by index to preserve correct order mapping
+  const shuffledDisplay = [...displayItems].sort(() => Math.random() - 0.5);
 
   gameState.sortChallenge = {
     category, categoryLabel: cat.label,
     prompt: cat.prompt,
-    correctOrder: q.items,      // correct answer (server only for scoring)
-    shuffledItems: shuffled,    // what players see
+    correctOrder: q.items,         // full items with hints (used for scoring + reveal)
+    displayItems: displayItems,    // clean display labels matching correctOrder positions
+    shuffledItems: shuffledDisplay, // what players see during game (no hints)
     hint: q.hint,
-    playerAnswers: {},          // { playerName: [ordered items] }
-    scores: {},                 // { playerName: points }
+    playerAnswers: {},
+    scores: {},
     revealed: false,
     timeLimit: timeLimit || 45,
     immunityType: immunityType || 'individual',
@@ -541,9 +544,10 @@ app.post('/sortit/answer', (req, res) => {
 
   sc.playerAnswers[playerName] = orderedItems;
 
-  // Score: count correct positions
+  // Score: match display items against displayItems in correct order
+  const correctDisplay = sc.displayItems || sc.correctOrder.map(item => item.replace(/\s*\([^)]+\)\s*$/, '').trim());
   let correct = 0;
-  orderedItems.forEach((item, i) => { if (item === sc.correctOrder[i]) correct++; });
+  orderedItems.forEach((item, i) => { if (item === correctDisplay[i]) correct++; });
   const pts = correct === 4 ? 3 : correct === 3 ? 2 : correct >= 2 ? 1 : 0;
   sc.scores[playerName] = pts;
   gameState.updatedAt = Date.now();
@@ -818,17 +822,20 @@ app.post('/sortit/start', (req, res) => {
 
   // Pick random question
   const q = cat.questions[Math.floor(Math.random() * cat.questions.length)];
-  // Shuffle items for players
-  const shuffled = [...q.items].sort(() => Math.random() - 0.5);
+  // Strip parenthetical hints from display (e.g. "Star Wars (1977)" -> "Star Wars")
+  const displayItems = q.items.map(item => item.replace(/\s*\([^)]+\)\s*$/, '').trim());
+  // Shuffle display items — track by index to preserve correct order mapping
+  const shuffledDisplay = [...displayItems].sort(() => Math.random() - 0.5);
 
   gameState.sortChallenge = {
     category, categoryLabel: cat.label,
     prompt: cat.prompt,
-    correctOrder: q.items,      // correct answer (server only for scoring)
-    shuffledItems: shuffled,    // what players see
+    correctOrder: q.items,         // full items with hints (used for scoring + reveal)
+    displayItems: displayItems,    // clean display labels matching correctOrder positions
+    shuffledItems: shuffledDisplay, // what players see during game (no hints)
     hint: q.hint,
-    playerAnswers: {},          // { playerName: [ordered items] }
-    scores: {},                 // { playerName: points }
+    playerAnswers: {},
+    scores: {},
     revealed: false,
     timeLimit: timeLimit || 45,
     immunityType: immunityType || 'individual',
@@ -853,9 +860,10 @@ app.post('/sortit/answer', (req, res) => {
 
   sc.playerAnswers[playerName] = orderedItems;
 
-  // Score: count correct positions
+  // Score: match display items against displayItems in correct order
+  const correctDisplay = sc.displayItems || sc.correctOrder.map(item => item.replace(/\s*\([^)]+\)\s*$/, '').trim());
   let correct = 0;
-  orderedItems.forEach((item, i) => { if (item === sc.correctOrder[i]) correct++; });
+  orderedItems.forEach((item, i) => { if (item === correctDisplay[i]) correct++; });
   const pts = correct === 4 ? 3 : correct === 3 ? 2 : correct >= 2 ? 1 : 0;
   sc.scores[playerName] = pts;
   gameState.updatedAt = Date.now();
