@@ -588,6 +588,110 @@ app.post('/sortit/end', (req, res) => {
   res.json({ ok: true, scores, immuneNames, correctOrder: sc.correctOrder });
 });
 
+
+// ── NAME THAT TUNE ENDPOINTS ──
+app.post('/ntt/start', (req, res) => {
+  if (!verifyHost(req, res)) return;
+  const { youtubeUrl, startSeconds, roundLabel, immunityType } = req.body;
+
+  // Extract YouTube video ID from URL
+  const match = youtubeUrl.match(/(?:v=|youtu\.be\/|embed\/)([a-zA-Z0-9_-]{11})/);
+  const videoId = match ? match[1] : null;
+  if (!videoId) return res.status(400).json({ error: 'Invalid YouTube URL' });
+
+  gameState.nttChallenge = {
+    videoId,
+    startSeconds: startSeconds || 0,
+    roundLabel: roundLabel || 'Name That Tune',
+    immunityType: immunityType || 'individual',
+    playing: false,
+    stopped: false,
+    playerAnswers: {},   // { playerName: { artist, song } }
+    scores: {},          // { playerName: 0|1|2 } (0=wrong, 1=song only, 2=both)
+    startedAt: Date.now(),
+    ended: false,
+  };
+  gameState.phase = 'challenge';
+  gameState.currentChallenge = { name: roundLabel || 'Name That Tune', type: 'ntt' };
+  gameState.pictureChallenge = null;
+  gameState.triviaChallenge = null;
+  gameState.sortChallenge = null;
+  gameState.immuneNames = [];
+  gameState.updatedAt = Date.now();
+  res.json({ ok: true, videoId });
+});
+
+// Host: signal play/stop to all clients
+app.post('/ntt/play', (req, res) => {
+  if (!verifyHost(req, res)) return;
+  if (!gameState.nttChallenge) return res.status(400).json({ error: 'No NTT active' });
+  gameState.nttChallenge.playing = true;
+  gameState.nttChallenge.stopped = false;
+  gameState.nttChallenge.playedAt = Date.now();
+  gameState.updatedAt = Date.now();
+  res.json({ ok: true });
+});
+
+app.post('/ntt/stop', (req, res) => {
+  if (!verifyHost(req, res)) return;
+  if (!gameState.nttChallenge) return res.status(400).json({ error: 'No NTT active' });
+  gameState.nttChallenge.playing = false;
+  gameState.nttChallenge.stopped = true;
+  gameState.updatedAt = Date.now();
+  res.json({ ok: true });
+});
+
+// Player: submit guess
+app.post('/ntt/answer', (req, res) => {
+  const { playerName, artist, song } = req.body;
+  const ntt = gameState.nttChallenge;
+  if (!ntt) return res.status(400).json({ error: 'No NTT active' });
+  if (ntt.playerAnswers[playerName]) return res.json({ ok: true, alreadyAnswered: true });
+  ntt.playerAnswers[playerName] = { artist: artist||'', song: song||'' };
+  ntt.scores[playerName] = 0; // default, host will score
+  gameState.updatedAt = Date.now();
+  res.json({ ok: true });
+});
+
+// Host: score a player (0=wrong, 1=song only, 2=artist+song)
+app.post('/ntt/score', (req, res) => {
+  if (!verifyHost(req, res)) return;
+  const { playerName, points } = req.body;
+  const ntt = gameState.nttChallenge;
+  if (!ntt) return res.status(400).json({ error: 'No NTT active' });
+  ntt.scores[playerName] = points;
+  gameState.updatedAt = Date.now();
+  res.json({ ok: true });
+});
+
+// Host: end + award immunity
+app.post('/ntt/end', (req, res) => {
+  if (!verifyHost(req, res)) return;
+  const ntt = gameState.nttChallenge;
+  if (!ntt) return res.status(400).json({ error: 'No NTT active' });
+  ntt.ended = true;
+  const { scores, immunityType } = ntt;
+  let immuneNames = [];
+  if (immunityType === 'team') {
+    const ts = {};
+    gameState.teams.forEach(t => ts[t] = 0);
+    gameState.players.filter(p => !p.eliminated).forEach(p => {
+      if (p.team) ts[p.team] = (ts[p.team] || 0) + (scores[p.name] || 0);
+    });
+    const max = Math.max(...Object.values(ts));
+    const winTeams = Object.entries(ts).filter(([,s]) => s === max).map(([t]) => t);
+    immuneNames = gameState.players.filter(p => !p.eliminated && winTeams.includes(p.team)).map(p => p.name);
+  } else {
+    const max = Math.max(...Object.values(scores), 0);
+    immuneNames = Object.entries(scores).filter(([,s]) => s === max).map(([n]) => n);
+  }
+  gameState.immuneNames = immuneNames;
+  gameState.players.forEach(p => { p.immune = immuneNames.includes(p.name); });
+  gameState.votingPool = gameState.players.filter(p => !p.eliminated && !p.immune).map(p => p.name);
+  gameState.updatedAt = Date.now();
+  res.json({ ok: true, scores, immuneNames });
+});
+
 app.get('/trivia/categories', (req, res) => {
   const cats = Object.entries(TRIVIA_DB).map(([key, val]) => ({ key, label: val.label, count: val.questions.length }));
   res.json(cats);
@@ -794,6 +898,110 @@ app.post('/sortit/end', (req, res) => {
   gameState.votingPool = gameState.players.filter(p => !p.eliminated && !p.immune).map(p => p.name);
   gameState.updatedAt = Date.now();
   res.json({ ok: true, scores, immuneNames, correctOrder: sc.correctOrder });
+});
+
+
+// ── NAME THAT TUNE ENDPOINTS ──
+app.post('/ntt/start', (req, res) => {
+  if (!verifyHost(req, res)) return;
+  const { youtubeUrl, startSeconds, roundLabel, immunityType } = req.body;
+
+  // Extract YouTube video ID from URL
+  const match = youtubeUrl.match(/(?:v=|youtu\.be\/|embed\/)([a-zA-Z0-9_-]{11})/);
+  const videoId = match ? match[1] : null;
+  if (!videoId) return res.status(400).json({ error: 'Invalid YouTube URL' });
+
+  gameState.nttChallenge = {
+    videoId,
+    startSeconds: startSeconds || 0,
+    roundLabel: roundLabel || 'Name That Tune',
+    immunityType: immunityType || 'individual',
+    playing: false,
+    stopped: false,
+    playerAnswers: {},   // { playerName: { artist, song } }
+    scores: {},          // { playerName: 0|1|2 } (0=wrong, 1=song only, 2=both)
+    startedAt: Date.now(),
+    ended: false,
+  };
+  gameState.phase = 'challenge';
+  gameState.currentChallenge = { name: roundLabel || 'Name That Tune', type: 'ntt' };
+  gameState.pictureChallenge = null;
+  gameState.triviaChallenge = null;
+  gameState.sortChallenge = null;
+  gameState.immuneNames = [];
+  gameState.updatedAt = Date.now();
+  res.json({ ok: true, videoId });
+});
+
+// Host: signal play/stop to all clients
+app.post('/ntt/play', (req, res) => {
+  if (!verifyHost(req, res)) return;
+  if (!gameState.nttChallenge) return res.status(400).json({ error: 'No NTT active' });
+  gameState.nttChallenge.playing = true;
+  gameState.nttChallenge.stopped = false;
+  gameState.nttChallenge.playedAt = Date.now();
+  gameState.updatedAt = Date.now();
+  res.json({ ok: true });
+});
+
+app.post('/ntt/stop', (req, res) => {
+  if (!verifyHost(req, res)) return;
+  if (!gameState.nttChallenge) return res.status(400).json({ error: 'No NTT active' });
+  gameState.nttChallenge.playing = false;
+  gameState.nttChallenge.stopped = true;
+  gameState.updatedAt = Date.now();
+  res.json({ ok: true });
+});
+
+// Player: submit guess
+app.post('/ntt/answer', (req, res) => {
+  const { playerName, artist, song } = req.body;
+  const ntt = gameState.nttChallenge;
+  if (!ntt) return res.status(400).json({ error: 'No NTT active' });
+  if (ntt.playerAnswers[playerName]) return res.json({ ok: true, alreadyAnswered: true });
+  ntt.playerAnswers[playerName] = { artist: artist||'', song: song||'' };
+  ntt.scores[playerName] = 0; // default, host will score
+  gameState.updatedAt = Date.now();
+  res.json({ ok: true });
+});
+
+// Host: score a player (0=wrong, 1=song only, 2=artist+song)
+app.post('/ntt/score', (req, res) => {
+  if (!verifyHost(req, res)) return;
+  const { playerName, points } = req.body;
+  const ntt = gameState.nttChallenge;
+  if (!ntt) return res.status(400).json({ error: 'No NTT active' });
+  ntt.scores[playerName] = points;
+  gameState.updatedAt = Date.now();
+  res.json({ ok: true });
+});
+
+// Host: end + award immunity
+app.post('/ntt/end', (req, res) => {
+  if (!verifyHost(req, res)) return;
+  const ntt = gameState.nttChallenge;
+  if (!ntt) return res.status(400).json({ error: 'No NTT active' });
+  ntt.ended = true;
+  const { scores, immunityType } = ntt;
+  let immuneNames = [];
+  if (immunityType === 'team') {
+    const ts = {};
+    gameState.teams.forEach(t => ts[t] = 0);
+    gameState.players.filter(p => !p.eliminated).forEach(p => {
+      if (p.team) ts[p.team] = (ts[p.team] || 0) + (scores[p.name] || 0);
+    });
+    const max = Math.max(...Object.values(ts));
+    const winTeams = Object.entries(ts).filter(([,s]) => s === max).map(([t]) => t);
+    immuneNames = gameState.players.filter(p => !p.eliminated && winTeams.includes(p.team)).map(p => p.name);
+  } else {
+    const max = Math.max(...Object.values(scores), 0);
+    immuneNames = Object.entries(scores).filter(([,s]) => s === max).map(([n]) => n);
+  }
+  gameState.immuneNames = immuneNames;
+  gameState.players.forEach(p => { p.immune = immuneNames.includes(p.name); });
+  gameState.votingPool = gameState.players.filter(p => !p.eliminated && !p.immune).map(p => p.name);
+  gameState.updatedAt = Date.now();
+  res.json({ ok: true, scores, immuneNames });
 });
 
 app.get('/trivia/categories', (req, res) => {
