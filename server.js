@@ -537,21 +537,46 @@ app.post('/sortit/start', (req, res) => {
 
 // ── SORT IT: SUBMIT ANSWER ──
 app.post('/sortit/answer', (req, res) => {
-  const { playerName, orderedItems } = req.body;
+  const { playerName, orderedItems, timeTaken } = req.body;
   const sc = gameState.sortChallenge;
   if (!sc || sc.ended) return res.status(400).json({ error: 'No active challenge' });
   if (sc.playerAnswers[playerName]) return res.json({ ok: true, alreadyAnswered: true });
 
   sc.playerAnswers[playerName] = orderedItems;
+  sc.playerTimes = sc.playerTimes || {};
+  sc.playerTimes[playerName] = timeTaken || sc.timeLimit;
 
-  // Score: match display items against displayItems in correct order
-  const correctDisplay = sc.displayItems || sc.correctOrder.map(item => item.replace(/\s*\([^)]+\)\s*$/, '').trim());
+  // Score: match trimmed display items against correct display order
+  const correctDisplay = sc.displayItems
+    ? sc.displayItems
+    : sc.correctOrder.map(item => item.replace(/\s*\([^)]+\)\s*$/, '').trim());
+
   let correct = 0;
-  orderedItems.forEach((item, i) => { if (item === correctDisplay[i]) correct++; });
-  const pts = correct === 4 ? 3 : correct === 3 ? 2 : correct >= 2 ? 1 : 0;
+  orderedItems.forEach((item, i) => {
+    const submitted = (item || '').trim();
+    const expected = (correctDisplay[i] || '').trim();
+    if (submitted === expected) correct++;
+  });
+
+  // Speed bonus: answer time affects score within accuracy tier
+  // 4 correct: 10-13pts based on speed
+  // 3 correct: 6-8pts
+  // 2 correct: 3-4pts
+  // 1 correct: 1pt
+  // 0 correct: 0pts
+  const t = timeTaken || sc.timeLimit;
+  const speedRatio = Math.max(0, 1 - (t / sc.timeLimit)); // 0-1, faster = higher
+  let pts = 0;
+  if (correct === 4) pts = 10 + Math.round(speedRatio * 3);       // 10-13
+  else if (correct === 3) pts = 6 + Math.round(speedRatio * 2);   // 6-8
+  else if (correct === 2) pts = 3 + Math.round(speedRatio * 1);   // 3-4
+  else if (correct === 1) pts = 1;
+  else pts = 0;
+
   sc.scores[playerName] = pts;
   gameState.updatedAt = Date.now();
-  res.json({ ok: true, correct, pts });
+  // Return debug info to help catch mismatches
+  res.json({ ok: true, correct, pts, correctDisplay, submitted: orderedItems });
 });
 
 // ── SORT IT: REVEAL (host) ──
@@ -853,21 +878,46 @@ app.post('/sortit/start', (req, res) => {
 
 // ── SORT IT: SUBMIT ANSWER ──
 app.post('/sortit/answer', (req, res) => {
-  const { playerName, orderedItems } = req.body;
+  const { playerName, orderedItems, timeTaken } = req.body;
   const sc = gameState.sortChallenge;
   if (!sc || sc.ended) return res.status(400).json({ error: 'No active challenge' });
   if (sc.playerAnswers[playerName]) return res.json({ ok: true, alreadyAnswered: true });
 
   sc.playerAnswers[playerName] = orderedItems;
+  sc.playerTimes = sc.playerTimes || {};
+  sc.playerTimes[playerName] = timeTaken || sc.timeLimit;
 
-  // Score: match display items against displayItems in correct order
-  const correctDisplay = sc.displayItems || sc.correctOrder.map(item => item.replace(/\s*\([^)]+\)\s*$/, '').trim());
+  // Score: match trimmed display items against correct display order
+  const correctDisplay = sc.displayItems
+    ? sc.displayItems
+    : sc.correctOrder.map(item => item.replace(/\s*\([^)]+\)\s*$/, '').trim());
+
   let correct = 0;
-  orderedItems.forEach((item, i) => { if (item === correctDisplay[i]) correct++; });
-  const pts = correct === 4 ? 3 : correct === 3 ? 2 : correct >= 2 ? 1 : 0;
+  orderedItems.forEach((item, i) => {
+    const submitted = (item || '').trim();
+    const expected = (correctDisplay[i] || '').trim();
+    if (submitted === expected) correct++;
+  });
+
+  // Speed bonus: answer time affects score within accuracy tier
+  // 4 correct: 10-13pts based on speed
+  // 3 correct: 6-8pts
+  // 2 correct: 3-4pts
+  // 1 correct: 1pt
+  // 0 correct: 0pts
+  const t = timeTaken || sc.timeLimit;
+  const speedRatio = Math.max(0, 1 - (t / sc.timeLimit)); // 0-1, faster = higher
+  let pts = 0;
+  if (correct === 4) pts = 10 + Math.round(speedRatio * 3);       // 10-13
+  else if (correct === 3) pts = 6 + Math.round(speedRatio * 2);   // 6-8
+  else if (correct === 2) pts = 3 + Math.round(speedRatio * 1);   // 3-4
+  else if (correct === 1) pts = 1;
+  else pts = 0;
+
   sc.scores[playerName] = pts;
   gameState.updatedAt = Date.now();
-  res.json({ ok: true, correct, pts });
+  // Return debug info to help catch mismatches
+  res.json({ ok: true, correct, pts, correctDisplay, submitted: orderedItems });
 });
 
 // ── SORT IT: REVEAL (host) ──
