@@ -1,12 +1,52 @@
 const express = require('express');
 const cors = require('cors');
+const fs = require('fs');
+const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 3001;
 
 app.use(cors());
 app.use(express.json());
 
-let gameState = null;
+// Auto-persist state after every POST request that modifies it
+app.use((req, res, next) => {
+  const originalJson = res.json.bind(res);
+  res.json = (data) => {
+    // Persist after any successful POST that returns ok:true
+    if (req.method === 'POST' && data?.ok && gameState) {
+      persistState();
+    }
+    return originalJson(data);
+  };
+  next();
+});
+
+// ── PERSISTENT STATE ──
+const STATE_FILE = path.join(__dirname, 'gamestate.json');
+
+function loadPersistedState() {
+  try {
+    if (fs.existsSync(STATE_FILE)) {
+      const raw = fs.readFileSync(STATE_FILE, 'utf8');
+      const saved = JSON.parse(raw);
+      console.log(`Restored game state: Round ${saved.round}, Phase: ${saved.phase}, Players: ${saved.players?.length || 0}`);
+      return saved;
+    }
+  } catch (e) {
+    console.error('Could not load persisted state:', e.message);
+  }
+  return null;
+}
+
+function persistState() {
+  try {
+    fs.writeFileSync(STATE_FILE, JSON.stringify(gameState), 'utf8');
+  } catch (e) {
+    console.error('Could not persist state:', e.message);
+  }
+}
+
+let gameState = loadPersistedState();
 
 const IMAGE_DB = {
   paintings: {
@@ -333,7 +373,9 @@ app.post('/round/next', (req, res) => {
 
 app.post('/reset', (req, res) => {
   if (!verifyHost(req, res)) return;
-  gameState = defaultState(); res.json({ ok: true });
+  gameState = defaultState();
+  persistState();
+  res.json({ ok: true });
 });
 
 
@@ -861,6 +903,12 @@ app.post('/trivia/end', (req, res) => {
 });
 
 
-app.get('/', (req, res) => res.json({ status: 'Ticcio Parties 🔥', round: gameState?.round || 0 }));
+app.get('/', (req, res) => res.json({
+  status: 'Ticcio Parties 🔥',
+  round: gameState?.round || 0,
+  phase: gameState?.phase || 'none',
+  players: gameState?.players?.length || 0,
+  persisted: fs.existsSync(STATE_FILE),
+}));
 
 app.listen(PORT, () => console.log(`Ticcio Parties server on port ${PORT}`));
