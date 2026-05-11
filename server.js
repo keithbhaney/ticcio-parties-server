@@ -392,9 +392,22 @@ app.post('/voting/reveal', (req, res) => {
     if (!teamPlayers.length) return res.status(400).json({ error: 'No active players in team ' + team });
 
     // Find player with most votes in this team
-    const target = teamPlayers.reduce((best, p) => {
-      return (tally[p.name] || 0) > (tally[best.name] || 0) ? p : best;
-    }, teamPlayers[0]);
+    const topTeamVotes = Math.max(...teamPlayers.map(p => tally[p.name] || 0));
+    const tiedTeamPlayers = teamPlayers.filter(p => (tally[p.name] || 0) === topTeamVotes);
+    const { forceEliminate } = req.body;
+
+    let target;
+    if (forceEliminate) {
+      target = teamPlayers.find(p => p.name === forceEliminate);
+    } else if (tiedTeamPlayers.length > 1 && topTeamVotes > 0) {
+      gameState.updatedAt = Date.now();
+      return res.json({ ok: true, tie: true, tiedPlayers: tiedTeamPlayers.map(p=>p.name), team, topVotes: topTeamVotes });
+    } else if (topTeamVotes === 0) {
+      gameState.updatedAt = Date.now();
+      return res.json({ ok: true, tie: true, tiedPlayers: teamPlayers.map(p=>p.name), team, topVotes: 0 });
+    } else {
+      target = tiedTeamPlayers[0];
+    }
 
     target.eliminated = true;
     if (!gameState.revealedTeams) gameState.revealedTeams = [];
@@ -425,17 +438,40 @@ app.post('/voting/reveal', (req, res) => {
 
   const revealNum = (gameState.revealCount || 0) + 1;
   const sorted = [...active].sort((a, b) => b.votes - a.votes);
-  const target = sorted[0];
-  if (!target) return res.status(400).json({ error: 'No target found' });
+  const topVotes = sorted[0]?.votes || 0;
+
+  // Check for tie — forceEliminate overrides tie
+  const { forceEliminate } = req.body;
+  const tied = sorted.filter(p => p.votes === topVotes && topVotes > 0);
+
+  let target;
+  if (forceEliminate) {
+    // Host broke the tie manually
+    target = active.find(p => p.name === forceEliminate);
+    if (!target) return res.status(400).json({ error: 'Player not found' });
+  } else if (tied.length > 1 && topVotes > 0) {
+    // Tie detected — ask host to break it
+    gameState.updatedAt = Date.now();
+    return res.json({ ok: true, tie: true, tiedPlayers: tied.map(p => p.name), topVotes });
+  } else if (topVotes === 0) {
+    // No votes cast at all
+    gameState.updatedAt = Date.now();
+    return res.json({ ok: true, tie: true, tiedPlayers: active.map(p => p.name), topVotes: 0 });
+  } else {
+    target = sorted[0];
+  }
 
   target.eliminated = true;
-  gameState.elimHistory.push({ name: target.name, team: target.team, round: gameState.round, votes: target.votes, revealNum });
+  gameState.elimHistory.push({
+    name: target.name, team: target.team, round: gameState.round,
+    votes: target.votes, revealNum, tiebroken: !!forceEliminate
+  });
   gameState.revealCount = revealNum;
   gameState.revealed = true;
 
   const isDone = !gameState.doubleElim || revealNum >= 2;
   gameState.updatedAt = Date.now();
-  res.json({ ok: true, eliminated: target, revealNum, doubleElim: gameState.doubleElim, isDone });
+  res.json({ ok: true, eliminated: target, revealNum, doubleElim: gameState.doubleElim, isDone, tiebroken: !!forceEliminate });
 });
 
 // ── MERGE TRIBES ──
