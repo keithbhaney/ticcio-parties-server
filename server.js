@@ -259,23 +259,41 @@ app.post('/vote', (req, res) => {
   const { voterName, targetName } = req.body;
   if (!gameState) return res.status(400).json({ error: 'No game' });
   if (gameState.phase !== 'voting') return res.status(400).json({ error: 'Voting not open' });
+
   const voter = gameState.players.find(p => p.name === voterName);
   const target = gameState.players.find(p => p.name === targetName);
   if (!voter || voter.eliminated) return res.status(400).json({ error: 'Not eligible' });
-  if (gameState.votes[voterName]) return res.status(400).json({ error: 'Already voted' });
+
   const teamsActive = gameState.teams.length > 1;
-  if (teamsActive) {
-    // Team mode: only losing team can vote, can only vote for own team
+  const isMultiTeam = gameState.multiTeamVoting && gameState.votingTeams && gameState.votingTeams.length > 0;
+  const voterTeam = voter.team || 'none';
+
+  // Check already voted — look in the right bucket
+  if (isMultiTeam) {
+    const teamBucket = gameState.teamVotes[voterTeam] || {};
+    if (teamBucket[voterName]) return res.status(400).json({ error: 'Already voted' });
+  } else {
+    if (gameState.votes[voterName]) return res.status(400).json({ error: 'Already voted' });
+  }
+
+  // Eligibility checks
+  if (teamsActive || isMultiTeam) {
     if (gameState.votingPool.length > 0 && !gameState.votingPool.includes(voterName))
       return res.status(403).json({ error: 'Your team won — no vote needed' });
     if (target && voter.team && target.team !== voter.team)
       return res.status(403).json({ error: 'You can only vote for your own team members' });
   }
-  // Both modes: can't vote for immune player
   if (target && target.immune) return res.status(403).json({ error: 'That player has immunity' });
-  // Can't vote for eliminated player
   if (target && target.eliminated) return res.status(403).json({ error: 'That player is already out' });
-  gameState.votes[voterName] = targetName;
+
+  // Store vote in the right bucket
+  if (isMultiTeam) {
+    if (!gameState.teamVotes[voterTeam]) gameState.teamVotes[voterTeam] = {};
+    gameState.teamVotes[voterTeam][voterName] = targetName;
+  } else {
+    gameState.votes[voterName] = targetName;
+  }
+
   gameState.updatedAt = Date.now();
   res.json({ ok: true });
 });
