@@ -282,60 +282,140 @@ app.post('/vote', (req, res) => {
 
 app.post('/voting/open', (req, res) => {
   if (!verifyHost(req, res)) return;
-  gameState.phase = 'voting'; gameState.votes = {};
+  const { doubleElim, multiTeam } = req.body;
+  let { losingTeams } = req.body;
+
+  gameState.phase = 'voting';
+  gameState.votes = {};
+  gameState.teamVotes = {};
+  gameState.teamTallies = {};
+  gameState.revealedTeams = [];
   gameState.players.forEach(p => { p.votes = 0; });
   gameState.revealed = false;
-  gameState.doubleElim = req.body.doubleElim || false;
+  gameState.doubleElim = doubleElim || false;
   gameState.revealCount = 0;
-  const teamsActive = gameState.teams.length > 1;
-  if (!teamsActive) {
-    // Individual mode: all alive players can vote (immune player votes but can't be voted for)
-    gameState.votingPool = [];  // empty = everyone can vote
+  gameState.multiTeamVoting = multiTeam || false;
+
+  if (multiTeam) {
+    // Auto-detect losing teams: all teams without immunity
+    if (!losingTeams || !losingTeams.length) {
+      const immuneTeams = new Set(gameState.players.filter(p => p.immune).map(p => p.team));
+      losingTeams = gameState.teams.filter(t =>
+        !immuneTeams.has(t) &&
+        gameState.players.some(p => !p.eliminated && p.team === t)
+      );
+    }
+    gameState.votingTeams = losingTeams;
+    gameState.votingPool = gameState.players
+      .filter(p => !p.eliminated && losingTeams.includes(p.team))
+      .map(p => p.name);
+    losingTeams.forEach(t => { gameState.teamVotes[t] = {}; });
+  } else {
+    gameState.votingTeams = [];
+    const teamsActive = gameState.teams.length > 1;
+    if (!teamsActive) {
+      gameState.votingPool = [];
+    }
   }
-  // Team mode: votingPool already set by challenge/immunity endpoints
+
   gameState.updatedAt = Date.now();
-  res.json({ ok: true });
+  res.json({ ok: true, votingTeams: gameState.votingTeams });
 });
 
 app.post('/voting/close', (req, res) => {
   if (!verifyHost(req, res)) return;
-  const tally = {};
-  gameState.players.filter(p => !p.eliminated).forEach(p => tally[p.name] = 0);
-  Object.values(gameState.votes).forEach(t => { if (tally[t] !== undefined) tally[t]++; });
-  gameState.players.forEach(p => { p.votes = tally[p.name] || 0; });
-  gameState.phase = 'reveal'; gameState.updatedAt = Date.now();
-  res.json({ ok: true });
+
+  if (gameState.multiTeamVoting && gameState.votingTeams && gameState.votingTeams.length) {
+    // Tally per team separately from teamVotes
+    gameState.votingTeams.forEach(team => {
+      const teamVotes = gameState.teamVotes[team] || {};
+      const tally = {};
+      gameState.players
+        .filter(p => !p.eliminated && p.team === team)
+        .forEach(p => { tally[p.name] = 0; });
+      Object.values(teamVotes).forEach(target => {
+        if (tally[target] !== undefined) tally[target]++;
+      });
+      gameState.teamTallies[team] = tally;
+      // Write vote counts back to players so reveal can use p.votes
+      Object.entries(tally).forEach(([name, count]) => {
+        const p = gameState.players.find(x => x.name === name);
+        if (p) p.votes = count;
+      });
+    });
+  } else {
+    // Standard single tally
+    const tally = {};
+    gameState.players.filter(p => !p.eliminated).forEach(p => { tally[p.name] = 0; });
+    Object.values(gameState.votes).forEach(t => {
+      if (tally[t] !== undefined) tally[t]++;
+    });
+    gameState.players.forEach(p => { p.votes = tally[p.name] || 0; });
+  }
+
+  gameState.phase = 'reveal';
+  gameState.updatedAt = Date.now();
+  res.json({ ok: true, teamTallies: gameState.teamTallies });
 });
 
 app.post('/voting/reveal', (req, res) => {
   if (!verifyHost(req, res)) return;
+
+  // ── MULTI-TEAM MODE: reveal one team at a time ──
+  if (gameState.multiTeamVoting && gameState.votingTeams && gameState.votingTeams.length) {
+    const { teamName } = req.body;
+    // Pick next unrevealed team if not specified
+    const team = teamName || gameState.votingTeams.find(t => !(gameState.revealedTeams || []).includes(t));
+    if (!team) return res.status(400).json({ error: 'All teams already revealed' });
+
+    // Use teamTallies for this team
+    const tally = gameState.teamTallies[team] || {};
+    const teamPlayers = gameState.players.filter(p => !p.eliminated && p.team === team);
+    if (!teamPlayers.length) return res.status(400).json({ error: 'No active players in team ' + team });
+
+    // Find player with most votes in this team
+    const target = teamPlayers.reduce((best, p) => {
+      return (tally[p.name] || 0) > (tally[best.name] || 0) ? p : best;
+    }, teamPlayers[0]);
+
+    target.eliminated = true;
+    if (!gameState.revealedTeams) gameState.revealedTeams = [];
+    gameState.revealedTeams.push(team);
+    gameState.elimHistory.push({
+      name: target.name,
+      team: target.team,
+      round: gameState.round,
+      votes: tally[target.name] || 0,
+      revealNum: gameState.revealedTeams.length,
+    });
+    gameState.revealed = true;
+
+    const allRevealed = gameState.revealedTeams.length >= gameState.votingTeams.length;
+    gameState.updatedAt = Date.now();
+    return res.json({
+      ok: true,
+      eliminated: { ...target, votes: tally[target.name] || 0 },
+      team,
+      allRevealed,
+      remaining: gameState.votingTeams.filter(t => !gameState.revealedTeams.includes(t)),
+    });
+  }
+
+  // ── STANDARD MODE: single or double elim ──
   const active = gameState.players.filter(p => !p.eliminated);
   if (!active.length) return res.status(400).json({ error: 'No players' });
 
-  // Sort by votes descending
-  const sorted = [...active].sort((a, b) => b.votes - a.votes);
   const revealNum = (gameState.revealCount || 0) + 1;
-
-  let target;
-  if (revealNum === 1) {
-    // First reveal: most votes
-    target = sorted[0];
-  } else {
-    // Second reveal: second most votes (already eliminated first)
-    const stillAlive = gameState.players.filter(p => !p.eliminated);
-    if (!stillAlive.length) return res.status(400).json({ error: 'No players left' });
-    target = stillAlive.sort((a, b) => b.votes - a.votes)[0];
-  }
+  const sorted = [...active].sort((a, b) => b.votes - a.votes);
+  const target = sorted[0];
+  if (!target) return res.status(400).json({ error: 'No target found' });
 
   target.eliminated = true;
   gameState.elimHistory.push({ name: target.name, team: target.team, round: gameState.round, votes: target.votes, revealNum });
   gameState.revealCount = revealNum;
   gameState.revealed = true;
 
-  // Done if single elim, or second reveal of double elim
   const isDone = !gameState.doubleElim || revealNum >= 2;
-  if (isDone) gameState.phase = 'reveal'; // stays reveal until host advances
-
   gameState.updatedAt = Date.now();
   res.json({ ok: true, eliminated: target, revealNum, doubleElim: gameState.doubleElim, isDone });
 });
@@ -356,6 +436,11 @@ app.post('/round/next', (req, res) => {
   gameState.phase = 'active';
   gameState.players.forEach(p => { p.immune = false; p.votes = 0; });
   gameState.votes = {};
+  gameState.teamVotes = {};
+  gameState.teamTallies = {};
+  gameState.votingTeams = [];
+  gameState.revealedTeams = [];
+  gameState.multiTeamVoting = false;
   gameState.votingPool = [];
   gameState.immuneNames = [];
   gameState.currentChallenge = null;
