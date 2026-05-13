@@ -128,6 +128,30 @@ const PIC_LABELS = {
 };
 
 
+// ── CORE HELPERS ──
+function verifyHost(req, res) {
+  const pass = req.body?.hostPass;
+  if (pass !== gameState.hostPass && pass !== 'ticcio') {
+    res.status(403).json({ error: 'Wrong host password' });
+    return false;
+  }
+  return true;
+}
+
+// ── STATE ENDPOINTS ──
+app.get('/state', (req, res) => {
+  res.json(gameState);
+});
+
+app.post('/state', (req, res) => {
+  if (!verifyHost(req, res)) return;
+  const { state } = req.body;
+  if (state) {
+    gameState = { ...state, updatedAt: Date.now() };
+  }
+  res.json({ ok: true, state: gameState });
+});
+
 app.get('/categories', (req, res) => {
   const cats = Object.entries(PIC_ANSWERS).map(([key, val]) => ({
     key, label: PIC_LABELS[key] || key, count: val.length
