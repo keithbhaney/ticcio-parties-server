@@ -46,7 +46,37 @@ function persistState() {
   }
 }
 
-let gameState = loadPersistedState();
+function defaultState() {
+  return {
+    gameName: 'Ticcio Survivor',
+    hostPass: 'ticcio',
+    phase: 'active',
+    round: 1,
+    eliminationMode: 'individual',
+    teams: [],
+    players: [],
+    votes: {},
+    teamVotes: {},
+    teamTallies: {},
+    votingPool: [],
+    votingTeams: [],
+    revealedTeams: [],
+    multiTeamVoting: false,
+    immuneNames: [],
+    currentChallenge: null,
+    pictureChallenge: null,
+    triviaChallenge: null,
+    sortChallenge: null,
+    nttChallenge: null,
+    revealed: false,
+    doubleElim: false,
+    revealCount: 0,
+    elimHistory: [],
+    updatedAt: Date.now(),
+  };
+}
+
+let gameState = loadPersistedState() || defaultState();
 
 // ── PICTURE CHALLENGE ANSWERS ──
 // Images live in PIC_DB on the frontend — server only stores answers for scoring
