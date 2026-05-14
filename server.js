@@ -86,7 +86,7 @@ const PIC_ANSWERS = {
     { answers: ["the starry night","starry night"], hint: "Van Gogh, 1889" },
     { answers: ["the scream","scream"], hint: "Edvard Munch, 1893" },
     { answers: ["girl with a pearl earring","pearl earring"], hint: "Vermeer, 1665" },
-    { answers: ["paris street rainy day","rainy day","paris street; rainy day"], hint: "Caillebotte, 1877" },
+    { answers: ["the birth of venus","birth of venus"], hint: "Botticelli, 1484" },
   ],
   cities: [
     { answers: ["sydney"], hint: "Opera House, Australia" },
@@ -106,15 +106,15 @@ const PIC_ANSWERS = {
     { answers: ["usain bolt","bolt"], hint: "World's fastest man" },
     { answers: ["muhammad ali","ali","cassius clay"], hint: "The Greatest" },
     { answers: ["roger federer","federer"], hint: "Swiss tennis legend" },
-    { answers: ["elvis presley","elvis"], hint: "King of Rock and Roll" },
+    { answers: ["caitlin clark","clark"], hint: "Iowa Hawkeyes, Indiana Fever" },
     { answers: ["pele","pelé"], hint: "Brazilian soccer legend" },
   ],
   animals: [
-    { answers: ["cat"], hint: "Common household pet" },
     { answers: ["koala"], hint: "Australian marsupial" },
     { answers: ["crocodile","nile crocodile"], hint: "Large African reptile" },
-    { answers: ["leopard gecko","gecko"], hint: "Small spotted lizard" },
     { answers: ["anteater","giant anteater"], hint: "Long snout, eats ants" },
+    { answers: ["snow leopard","leopard"], hint: "Big cat, Central Asia" },
+    { answers: ["narwhal"], hint: "Unicorn of the sea" },
   ],
 };
 
