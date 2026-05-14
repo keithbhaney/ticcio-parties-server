@@ -871,15 +871,19 @@ app.post('/sortit/end', (req, res) => {
 app.post('/ntt/start', (req, res) => {
   if (!verifyHost(req, res)) return;
   const { roundLabel, timerSeconds, immunityType } = req.body;
+  const totalSongs = req.body.totalSongs || 5;
   gameState.nttChallenge = {
-    roundLabel: roundLabel || 'Name That Tune',
+    roundLabel: roundLabel || 'Song 1 of '+totalSongs,
     timerSeconds: timerSeconds || 20,
     immunityType: immunityType || 'individual',
+    totalSongs,
+    songNumber: 1,
     playing: false,
     stopped: false,
     playedAt: null,
     playerAnswers: {},
-    scores: {},
+    scores: {},       // cumulative across all songs
+    currentSongScores: {},
     startedAt: Date.now(),
     ended: false,
   };
@@ -943,9 +947,31 @@ app.post('/ntt/score', (req, res) => {
     finalScore = points + speedBonus;
   }
 
-  ntt.scores[playerName] = finalScore;
+  // Accumulate into total scores (add this song's score to running total)
+  // First remove previous score for this song if host re-scores
+  const prevSongScore = ntt.currentSongScores[playerName] || 0;
+  ntt.currentSongScores[playerName] = finalScore;
+  ntt.scores[playerName] = Math.max(0, (ntt.scores[playerName] || 0) - prevSongScore + finalScore);
   gameState.updatedAt = Date.now();
-  res.json({ ok: true, score: finalScore });
+  res.json({ ok: true, score: finalScore, totalScore: ntt.scores[playerName] });
+});
+
+app.post('/ntt/next', (req, res) => {
+  if (!verifyHost(req, res)) return;
+  const ntt = gameState.nttChallenge;
+  if (!ntt) return res.status(400).json({ error: 'No NTT active' });
+  const { roundLabel } = req.body;
+  // Advance to next song — keep cumulative scores, reset per-song state
+  ntt.songNumber = (ntt.songNumber || 1) + 1;
+  ntt.roundLabel = roundLabel || `Song ${ntt.songNumber} of ${ntt.totalSongs || 5}`;
+  ntt.playing = false;
+  ntt.stopped = false;
+  ntt.playedAt = null;
+  ntt.playerAnswers = {};
+  ntt.currentSongScores = {}; // scores just for this song
+  ntt.startedAt = Date.now(); // trigger client reset via startedAt change
+  gameState.updatedAt = Date.now();
+  res.json({ ok: true, songNumber: ntt.songNumber });
 });
 
 app.post('/ntt/end', (req, res) => {
