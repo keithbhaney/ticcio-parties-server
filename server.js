@@ -917,19 +917,35 @@ app.post('/ntt/answer', (req, res) => {
   const ntt = gameState.nttChallenge;
   if (!ntt || ntt.ended) return res.status(400).json({ error: 'No active NTT' });
   if (ntt.playerAnswers[playerName]) return res.json({ ok: true, alreadyAnswered: true });
-  ntt.playerAnswers[playerName] = { artist: artist||'', song: song||'' };
-  ntt.scores[playerName] = 0;
+  // Record how long after timer started they answered
+  const timeTaken = ntt.playedAt ? (Date.now() - ntt.playedAt) / 1000 : ntt.timerSeconds;
+  ntt.playerAnswers[playerName] = { artist: artist||'', song: song||'', timeTaken };
+  ntt.scores[playerName] = 0; // set to 0 until host scores
   gameState.updatedAt = Date.now();
-  res.json({ ok: true });
+  res.json({ ok: true, timeTaken });
 });
 
 app.post('/ntt/score', (req, res) => {
   if (!verifyHost(req, res)) return;
   const { playerName, points } = req.body;
-  if (!gameState.nttChallenge) return res.status(400).json({ error: 'No NTT active' });
-  gameState.nttChallenge.scores[playerName] = points;
+  const ntt = gameState.nttChallenge;
+  if (!ntt) return res.status(400).json({ error: 'No NTT active' });
+
+  let finalScore = points; // 0=wrong, 1=song only, 2=both
+
+  if (points > 0) {
+    // Add speed bonus based on how quickly they answered relative to timer
+    const timeTaken = ntt.playerAnswers[playerName]?.timeTaken || ntt.timerSeconds;
+    const ratio = timeTaken / ntt.timerSeconds; // 0=instant, 1=last second
+    let speedBonus = 0;
+    if (ratio <= 0.25) speedBonus = 2;       // answered in first 25% of time
+    else if (ratio <= 0.50) speedBonus = 1;  // answered in first 50% of time
+    finalScore = points + speedBonus;
+  }
+
+  ntt.scores[playerName] = finalScore;
   gameState.updatedAt = Date.now();
-  res.json({ ok: true });
+  res.json({ ok: true, score: finalScore });
 });
 
 app.post('/ntt/end', (req, res) => {
