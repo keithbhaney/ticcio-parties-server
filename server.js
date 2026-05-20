@@ -736,7 +736,14 @@ const TRIVIA_DB = {
       { q:"Which company's logo is a stylized bird?", options:["Facebook","Instagram","Twitter/X","Snapchat"], correct:2, difficulty:2 },
       { q:"What year was the Google logo first introduced?", options:["1995","1997","1998","2000"], correct:2, difficulty:5 }
     ]
-  }
+  },
+  mayday: { label: "🎉 Mayday", questions: [
+    { q:"What city was Cory born in?", options:["Pensacola, FL","Layton, UT","Salt Lake City, UT","Chicago, IL"], correct:0, difficulty:2 },
+    { q:"Where did Cory NOT work?", options:["Amazon","Arby's","Axis 41","Healthrider"], correct:1, difficulty:3 },
+    { q:"Which team was NOT a favorite of Cory's?", options:["Notre Dame","Green Bay Packers","Utah Utes","Duke Blue Devils"], correct:3, difficulty:3 },
+    { q:"What sport did Cory play in High School?", options:["Baseball","Basketball","Football","Wrestling"], correct:2, difficulty:2 },
+    { q:"What was the name of Cory's company?", options:["OutdoorCo.ch","OutdoorLLC.ch","Outdoorstore.ch","OutdoorShop.ch"], correct:2, difficulty:4 }
+  ]}
 };
 
 // ── TRIVIA: GET CATEGORIES ──
