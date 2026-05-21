@@ -200,15 +200,22 @@ app.post('/picture/answer', (req, res) => {
   if (!gameState?.pictureChallenge) return res.status(400).json({ error: 'No challenge active' });
   if (gameState.pictureChallenge.ended) return res.status(400).json({ error: 'Challenge ended' });
   gameState.pictureChallenge.playerAnswers[playerName] = answers;
+  if (!gameState.pictureChallenge.playerTimes) gameState.pictureChallenge.playerTimes = {};
+  const picTimeTaken = (Date.now() - gameState.pictureChallenge.startedAt) / 1000;
+  gameState.pictureChallenge.playerTimes[playerName] = picTimeTaken;
   const q = gameState.pictureChallenge.questions;
-  let score = 0;
+  let correctCount = 0;
   answers.forEach((ans, i) => {
     const norm = (ans || '').trim().toLowerCase();
-    if (q[i] && q[i].answers.some(a => a.toLowerCase() === norm)) score++;
+    if (q[i] && q[i].answers.some(a => a.toLowerCase() === norm)) correctCount++;
   });
+  const picSecondsRemaining = Math.max(0, gameState.pictureChallenge.timeLimit - picTimeTaken);
+  const score = correctCount > 0
+    ? correctCount + Math.round(picSecondsRemaining * (correctCount / Math.max(q.length, 1)))
+    : 0;
   gameState.pictureChallenge.scores[playerName] = score;
   gameState.updatedAt = Date.now();
-  res.json({ ok: true, score });
+  res.json({ ok: true, score, correctCount });
 });
 
 app.post('/picture/end', (req, res) => {
@@ -822,11 +829,12 @@ app.post('/sortit/answer', (req, res) => {
   // 0 correct: 0pts
   const t = timeTaken || sc.timeLimit;
   const speedRatio = Math.max(0, 1 - (t / sc.timeLimit)); // 0-1, faster = higher
+  const secondsRemaining = Math.max(0, sc.timeLimit - t);
   let pts = 0;
-  if (correct === 4) pts = 10 + Math.round(speedRatio * 3);       // 10-13
-  else if (correct === 3) pts = 6 + Math.round(speedRatio * 2);   // 6-8
-  else if (correct === 2) pts = 3 + Math.round(speedRatio * 1);   // 3-4
-  else if (correct === 1) pts = 1;
+  if (correct === 4) pts = 4 + Math.round(secondsRemaining); // all correct: 4 base + time bonus
+  else if (correct === 3) pts = 3 + Math.round(secondsRemaining * 0.75);
+  else if (correct === 2) pts = 2 + Math.round(secondsRemaining * 0.5);
+  else if (correct === 1) pts = 1 + Math.round(secondsRemaining * 0.25);
   else pts = 0;
 
   sc.scores[playerName] = pts;
@@ -945,13 +953,9 @@ app.post('/ntt/score', (req, res) => {
   let finalScore = points; // 0=wrong, 1=song only, 2=both
 
   if (points > 0) {
-    // Add speed bonus based on how quickly they answered relative to timer
     const timeTaken = ntt.playerAnswers[playerName]?.timeTaken || ntt.timerSeconds;
-    const ratio = timeTaken / ntt.timerSeconds; // 0=instant, 1=last second
-    let speedBonus = 0;
-    if (ratio <= 0.25) speedBonus = 2;       // answered in first 25% of time
-    else if (ratio <= 0.50) speedBonus = 1;  // answered in first 50% of time
-    finalScore = points + speedBonus;
+    const secondsRemaining = Math.max(0, ntt.timerSeconds - timeTaken);
+    finalScore = points + Math.round(secondsRemaining); // base + seconds left
   }
 
   // Accumulate into total scores (add this song's score to running total)
@@ -1076,13 +1080,11 @@ app.post('/trivia/answer', (req, res) => {
   tc.playerAnswers[playerName][qIdx] = answerIndex;
   tc.playerTimes[playerName][qIdx] = timeTaken || tc.timePerQ;
 
-  // Score: correct answer earns points based on speed
   const correct = tc.questions[qIdx].correct === answerIndex;
   let pts = 0;
   if (correct) {
-    if (timeTaken <= 5) pts = 3;
-    else if (timeTaken <= 10) pts = 2;
-    else pts = 1;
+    const secondsRemaining = Math.max(0, tc.timePerQ - (timeTaken || tc.timePerQ));
+    pts = 1 + Math.round(secondsRemaining); // base 1 + seconds remaining
   }
   if (!tc.scores[playerName]) tc.scores[playerName] = 0;
   tc.scores[playerName] += pts;
